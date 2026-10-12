@@ -52,7 +52,8 @@ Tarifa actual de referencia: Octopus 3 (fecha final 10/01/2027).
   - Criterio: maximizar la cobertura solar minimizando la energía importada de red.
   - Periodo: anual. Cobertura anual = Σ autoconsumo_h / Σ (E_hogar_h + E_cargador_h).
   - El addon debe guardar el histórico horario para calcularla (persistente ante reinicios).
-  - Pendiente: ¿año natural o año móvil? Fuente de datos oficial.
+  - Año natural (1 enero – 31 diciembre).
+  - Pendiente: fuente de datos oficial.
   - Propuesta: el addon publica en HA un sensor con el % acumulado y su tendencia.
   - Implicación: cada kWh cargado de red (también de noche) reduce el %.
 
@@ -67,7 +68,26 @@ Tarifa actual de referencia: Octopus 3 (fecha final 10/01/2027).
 - Al final de cada hora, el balance se reinicia.
 - Parámetros: tiempo mínimo encendido/apagado, margen de seguridad (Wh), umbral de cobertura.
 
-## 6. Riesgos / mejoras posibles
+- Últimos minutos de la hora: en los últimos X min (parametrizable, p. ej. 10) solo se arranca si el excedente ya acumulado cubre la carga hasta el final de la hora. (Aprobado)
+
+## 6. Carga forzada (modo necesidad)
+- Permite programar una carga que ignora las reglas solares, a la intensidad máxima configurada (actualmente 21 A).
+- Parámetros: hora de inicio, duración (y/o hora de fin) e intensidad (por defecto la máxima).
+- Ejemplo: esta noche desde las 00:00 durante 4 h a 21 A.
+- Controlable desde HA (entidades del addon: activar/cancelar, inicio, duración, intensidad).
+- La energía de red consumida computa en la cobertura anual.
+
+## 7. Gestión de errores: desconexión del cargador
+- Contexto: cobertura WiFi deficiente, microcortes frecuentes.
+- Detectar entidades del cargador en estado `unavailable`/`unknown`.
+- Reintentos de comandos con espera progresiva.
+- Al reconectar: leer el estado real del cargador y reaplicar el estado deseado (encendido/apagado, amperios).
+- Microcortes breves (< tiempo de tolerancia parametrizable): no cambiar de estado ni alertar.
+- Cortes largos: notificación en HA.
+- El balance horario usa contadores acumulados, por lo que tolera huecos de lectura sin perder energía.
+- Registro (log) de incidencias.
+
+## 8. Riesgos / mejoras posibles
 - Los últimos minutos de cada hora dejan poco margen de corrección: aplicar margen de seguridad. Propuesta: en los últimos X min (parametrizable, p. ej. 10) solo se arranca si el excedente ya acumulado cubre la carga hasta el final de la hora.
 - Exceso de potencia contratada: mitigado por el balanceo de carga del propio cargador (no es responsabilidad del addon).
 - Ahorro estimado por kWh cargado con solar en lugar de con red (sin impuestos): ~0,067 € frente a valle (0,087 − 0,02), ~0,099 € frente a 0,119 y ~0,178 € frente a 0,198.
