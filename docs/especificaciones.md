@@ -22,6 +22,7 @@
   - Balanceo de carga propio: mide hogar + cargador, no supera 21 A totales y pausa la carga si quedan < 6 A disponibles.
   - Su sensor de potencia lo proporciona el propio cargador (posible actualización más rápida, pendiente confirmar).
 
+- Coche: Citroën ë-C4 (2021). Batería ~50 kWh brutos / ~46 kWh útiles (dato de fabricante, a confirmar). Cargador embarcado ≥ 7,4 kW monofásico (21 A no limita).
 - Sin batería doméstica.
 - Potencia contratada: 4,9 kW, igual en punta y valle (se quiere reducir; el límite de 21 A del cargador debe ajustarse en consecuencia).
 
@@ -44,7 +45,12 @@ Tarifa actual de referencia: Octopus 3 (fecha final 10/01/2027).
 - Objetivo del usuario: autoconsumir toda la generación posible.
 - Requisitos: tramos horarios editables, distinción laborable/festivo, precio de compensación editable, potencia contratada editable.
 
-## 4. Objetivos
+## 4. Uso del coche
+- Laborables: conectado desde ~14:30. Fines de semana: casi todo el día.
+- ~550 km/mes (algunos meses ~1.100 km por viajes).
+- Necesidad estimada: ~90–110 kWh/mes (≈ 3–3,5 kWh/día); el doble en meses de viaje. Estimación con ~16–18 kWh/100 km + pérdidas; a validar con datos reales.
+
+## 4b. Objetivos
 - Autoconsumir toda la generación posible.
 - Alcanzar ≥ 60 % del consumo cubierto directamente por solar (ventajas fiscales). Umbral parametrizable.
   - Indicador: cobertura solar = energía solar autoconsumida / (consumo hogar + consumo cargador).
@@ -92,6 +98,8 @@ Tarifa actual de referencia: Octopus 3 (fecha final 10/01/2027).
 - Registro (log) de incidencias.
 
 ## 8. Riesgos / mejoras posibles
+- Comportamiento del ë-C4 ante paradas/arranques repetidos (posible que no reanude tras una pausa larga): validar en pruebas reales.
+- Invierno: entre 14:30 y la puesta de sol queda poco margen solar en laborables.
 - Los últimos minutos de cada hora dejan poco margen de corrección: aplicar margen de seguridad. Propuesta: en los últimos X min (parametrizable, p. ej. 10) solo se arranca si el excedente ya acumulado cubre la carga hasta el final de la hora.
 - Exceso de potencia contratada: mitigado por el balanceo de carga del propio cargador (no es responsabilidad del addon).
 - Ahorro estimado por kWh cargado con solar en lugar de con red (sin impuestos): ~0,067 € frente a valle (0,087 − 0,02), ~0,099 € frente a 0,119 y ~0,178 € frente a 0,198.
