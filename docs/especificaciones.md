@@ -23,6 +23,7 @@
   - Su sensor de potencia lo proporciona el propio cargador (posible actualización más rápida, pendiente confirmar).
 
 - Coche: Citroën ë-C4 (2021). Batería ~50 kWh brutos / ~46 kWh útiles (dato de fabricante, a confirmar). Cargador embarcado ≥ 7,4 kW monofásico (21 A no limita).
+- Instalación FV: ~2,45 kWp; potencia máxima observada ~1,8 kW.
 - Sin batería doméstica.
 - Potencia contratada: 4,9 kW, igual en punta y valle (se quiere reducir; el límite de 21 A del cargador debe ajustarse en consecuencia).
 
@@ -49,6 +50,10 @@ Tarifa actual de referencia: Octopus 3 (fecha final 10/01/2027).
 - Laborables: conectado desde ~14:30. Fines de semana: casi todo el día.
 - ~550 km/mes (algunos meses ~1.100 km por viajes).
 - Necesidad estimada: ~90–110 kWh/mes (≈ 3–3,5 kWh/día); el doble en meses de viaje. Estimación con ~16–18 kWh/100 km + pérdidas; a validar con datos reales.
+
+- Nivel de batería (SoC) del coche: entidad disponible pero se actualiza poco; fiable al apagar el coche (envía SoC y ubicación).
+  - Propuesta: tomar el SoC recibido al aparcar como punto de partida y estimar el SoC durante la carga sumando la energía del cargador × eficiencia / capacidad útil (parámetros configurables).
+  - Opcional: aviso si el SoC estimado baja de un umbral y no hay previsión solar suficiente.
 
 ## 4b. Objetivos
 - Autoconsumir toda la generación posible.
@@ -98,6 +103,8 @@ Tarifa actual de referencia: Octopus 3 (fecha final 10/01/2027).
 - Registro (log) de incidencias.
 
 ## 8. Riesgos / mejoras posibles
+- Potencia FV pequeña (máx. ~1,8 kW) frente al mínimo de carga (1,4 kW): el excedente rara vez supera 1,4 kW de forma continua; el balance horario (carga a 6 A durante parte de la hora) es clave.
+- Objetivo del 60 % potencialmente inalcanzable con la instalación actual sin batería: validar con consumo anual del hogar y producción anual real.
 - Comportamiento del ë-C4 ante paradas/arranques repetidos (posible que no reanude tras una pausa larga): validar en pruebas reales.
 - Invierno: entre 14:30 y la puesta de sol queda poco margen solar en laborables.
 - Los últimos minutos de cada hora dejan poco margen de corrección: aplicar margen de seguridad. Propuesta: en los últimos X min (parametrizable, p. ej. 10) solo se arranca si el excedente ya acumulado cubre la carga hasta el final de la hora.
