@@ -1,0 +1,30 @@
+configuration:
+  generation_power_entity: { name: Potencia generada (placas), description: "Sensor de potencia instantánea de las placas (kW o W)." }
+  home_power_entity: { name: Potencia del hogar, description: "Consumo del hogar SIN incluir el cargador (kW o W)." }
+  charger_power_entity: { name: Potencia del cargador, description: "Potencia que consume el cargador (kW o W)." }
+  generation_energy_entity: { name: Energía generada acumulada, description: "Contador de energía de las placas (kWh o Wh)." }
+  home_energy_entity: { name: Energía del hogar acumulada, description: "Contador de energía del hogar sin cargador (kWh o Wh)." }
+  charger_energy_entity: { name: Energía del cargador acumulada, description: "Contador de energía del cargador (kWh o Wh)." }
+  charger_switch_entity: { name: Interruptor del cargador, description: "Entidad switch que inicia/detiene la carga." }
+  charger_current_entity: { name: Intensidad del cargador, description: "Entidad number con la intensidad máxima (A)." }
+  car_soc_entity: { name: Batería del coche (opcional), description: "Sensor de nivel de batería del coche (%)." }
+  workday_entity: { name: Sensor de día laborable (opcional), description: "binary_sensor de la integración Workday; tiene prioridad sobre la lista de festivos." }
+  voltage: { name: Tensión (V) }
+  min_current: { name: Intensidad mínima (A) }
+  max_current: { name: Intensidad máxima (A) }
+  poll_interval_seconds: { name: Intervalo de lectura (s) }
+  decision_interval_minutes: { name: Intervalo de decisión (min) }
+  end_of_hour_window_minutes: { name: Ventana final de la hora (min), description: "En estos últimos minutos solo se arranca si el saldo ya acumulado cubre la carga hasta el cierre." }
+  hour_close_delay_minutes: { name: Retraso de cierre de hora (min), description: "Minutos que la hora anterior sigue abierta para recibir lecturas tardías de los sensores." }
+  safety_margin_wh: { name: Margen de seguridad (Wh) }
+  min_on_minutes: { name: Tiempo mínimo encendido (min) }
+  min_off_minutes: { name: Tiempo mínimo apagado (min) }
+  disconnect_tolerance_seconds: { name: Tolerancia a microcortes (s) }
+  disconnect_notify_minutes: { name: Aviso de desconexión tras (min) }
+  coverage_target_percent: { name: Objetivo de cobertura solar anual (%) }
+  compensation_price: { name: Compensación de excedentes (€/kWh) }
+  car_battery_kwh: { name: Capacidad útil de la batería del coche (kWh) }
+  charging_efficiency: { name: Eficiencia de carga (0,5–1) }
+  holidays: { name: Festivos (AAAA-MM-DD) }
+  tariff_periods: { name: Tramos de tarifa, description: "days: laborable o festivo (fines de semana y festivos). start/end en HH:MM (end puede ser 24:00). price en €/kWh sin impuestos." }
+  log_level: { name: Nivel de registro }

@@ -1,0 +1,87 @@
+name: Solar Charger Balancer
+version: "0.1.0"
+slug: solar_charger_balancer
+description: Carga el coche con los excedentes solares usando el balance neto horario.
+url: https://github.com/julio-gb/solar-charguer-net-balancer
+arch:
+  - aarch64
+  - amd64
+  - armv7
+init: false
+startup: application
+boot: auto
+homeassistant_api: true
+services:
+  - mqtt:need
+options:
+  generation_power_entity: ""
+  home_power_entity: ""
+  charger_power_entity: ""
+  generation_energy_entity: ""
+  home_energy_entity: ""
+  charger_energy_entity: ""
+  charger_switch_entity: ""
+  charger_current_entity: ""
+  car_soc_entity: ""
+  workday_entity: ""
+  voltage: 230
+  min_current: 6
+  max_current: 21
+  poll_interval_seconds: 30
+  decision_interval_minutes: 5
+  end_of_hour_window_minutes: 10
+  hour_close_delay_minutes: 10
+  safety_margin_wh: 50
+  min_on_minutes: 5
+  min_off_minutes: 5
+  disconnect_tolerance_seconds: 120
+  disconnect_notify_minutes: 15
+  coverage_target_percent: 60
+  compensation_price: 0.02
+  car_battery_kwh: 46
+  charging_efficiency: 0.9
+  holidays: []
+  tariff_periods:
+    - { days: laborable, start: "00:00", end: "08:00", price: 0.087 }
+    - { days: laborable, start: "08:00", end: "10:00", price: 0.119 }
+    - { days: laborable, start: "10:00", end: "14:00", price: 0.198 }
+    - { days: laborable, start: "14:00", end: "18:00", price: 0.119 }
+    - { days: laborable, start: "18:00", end: "22:00", price: 0.198 }
+    - { days: laborable, start: "22:00", end: "24:00", price: 0.119 }
+    - { days: festivo, start: "00:00", end: "24:00", price: 0.087 }
+  log_level: info
+schema:
+  generation_power_entity: str
+  home_power_entity: str
+  charger_power_entity: str
+  generation_energy_entity: str
+  home_energy_entity: str
+  charger_energy_entity: str
+  charger_switch_entity: str
+  charger_current_entity: str
+  car_soc_entity: str?
+  workday_entity: str?
+  voltage: int(100,400)
+  min_current: int(1,32)
+  max_current: int(1,32)
+  poll_interval_seconds: int(10,300)
+  decision_interval_minutes: int(1,30)
+  end_of_hour_window_minutes: int(0,30)
+  hour_close_delay_minutes: int(0,30)
+  safety_margin_wh: int(0,1000)
+  min_on_minutes: int(0,60)
+  min_off_minutes: int(0,60)
+  disconnect_tolerance_seconds: int(0,3600)
+  disconnect_notify_minutes: int(1,1440)
+  coverage_target_percent: int(1,100)
+  compensation_price: float(0,)
+  car_battery_kwh: float(1,)
+  charging_efficiency: float(0.5,1)
+  holidays:
+    - match(^\d{4}-\d{2}-\d{2}$)
+  tariff_periods:
+    - days: list(laborable|festivo)
+      start: match(^([01]\d|2[0-3]):[0-5]\d$)
+      end: match(^(([01]\d|2[0-3]):[0-5]\d|24:00)$)
+      price: float(0,)
+  log_level: list(debug|info|warning|error)

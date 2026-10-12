@@ -130,3 +130,13 @@ Tarifa actual de referencia: Octopus 3 (fecha final 10/01/2027).
 - Evitar arranques/paradas frecuentes (histéresis y tiempos mínimos) para proteger cargador y coche.
 - Resolución de 5 min: reacción lenta ante nubes o picos de consumo.
 - Mejora opcional: lectura local Modbus TCP (integración `huawei_solar`), pendiente de viabilidad con el instalador.
+
+## 11. Estado de implementación (v0.1.0)
+- Implementado: balance neto horario, ventana final de la hora, tiempos mínimos, carga forzada puntual,
+  tolerancia a microcortes y reaplicación de estado, cobertura anual con proyección, SoC estimado,
+  ahorro estimado, entidades MQTT Discovery y dashboard (`dashboards/solar_charger.yaml`).
+- Añadido en desarrollo: la hora anterior se cierra con 10 min de retraso (parametrizable) y las
+  lecturas tardías se reparten entre horas según su marca de tiempo.
+- No incluido: término de potencia (no afecta a las decisiones de carga).
+- Pendiente de validar en instalación real: construcción de la imagen Docker, nombres de entidades
+  de la integración Beny WiFi y comportamiento del ë-C4 ante pausas.
