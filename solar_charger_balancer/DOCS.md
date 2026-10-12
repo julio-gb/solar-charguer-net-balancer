@@ -10,6 +10,14 @@ de la red, aunque dentro de la hora haya momentos de importación.
 - Integración del cargador con interruptor (`switch`) e intensidad (`number`).
 - Para el dashboard: Mushroom y ApexCharts Card (HACS).
 
+## Configuración
+Abre **Solar Charger** en la barra lateral de HA. Cada entidad se elige en un desplegable
+que solo muestra las compatibles (potencias en W/kW, energías en Wh/kWh, interruptores,
+intensidades en A, batería en %). Marca «Mostrar todas» si la tuya no aparece.
+Ahí también se editan tarifas, festivos y el resto de parámetros; al guardar se aplican
+sin reiniciar. La pestaña «Configuración» del addon solo aporta los valores iniciales:
+lo guardado en la página tiene prioridad.
+
 ## Cómo decide (cada 5 min por defecto)
 1. Calcula la energía de la hora en curso con los contadores acumulados.
 2. Disponible = saldo de la hora + (P. placas − P. hogar) × tiempo restante − margen.

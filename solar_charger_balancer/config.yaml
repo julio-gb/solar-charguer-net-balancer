@@ -1,5 +1,5 @@
 name: Solar Charger Balancer
-version: "0.1.1"
+version: "0.2.0"
 slug: solar_charger_balancer
 description: Carga el coche con los excedentes solares usando el balance neto horario.
 url: https://github.com/julio-gb/solar-charguer-net-balancer
@@ -11,6 +11,10 @@ init: false
 startup: application
 boot: auto
 homeassistant_api: true
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:solar-power-variant
+panel_title: Solar Charger
 services:
   - mqtt:need
 options:
@@ -51,14 +55,14 @@ options:
     - { days: festivo, start: "00:00", end: "24:00", price: 0.087 }
   log_level: info
 schema:
-  generation_power_entity: str
-  home_power_entity: str
-  charger_power_entity: str
-  generation_energy_entity: str
-  home_energy_entity: str
-  charger_energy_entity: str
-  charger_switch_entity: str
-  charger_current_entity: str
+  generation_power_entity: str?
+  home_power_entity: str?
+  charger_power_entity: str?
+  generation_energy_entity: str?
+  home_energy_entity: str?
+  charger_energy_entity: str?
+  charger_switch_entity: str?
+  charger_current_entity: str?
   car_soc_entity: str?
   workday_entity: str?
   voltage: int(100,400)

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0
+- Página de configuración en el panel lateral de HA (Ingress): entidades en desplegables
+  filtrados por unidad, editor de tramos de tarifa y festivos, y resto de parámetros.
+- Los cambios se aplican en caliente, sin reiniciar el addon.
+- Validación de tarifas: sin huecos ni solapes y cubriendo hasta las 24:00.
+- El addon arranca aunque falten entidades y muestra «Sin configurar».
+
 ## 0.1.1
 - Icono y logo del addon.
 

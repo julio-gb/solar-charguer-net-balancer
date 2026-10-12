@@ -57,6 +57,9 @@ class HAClient:
     async def get_config(self) -> dict:
         return await self._request("GET", "/config") or {}
 
+    async def get_states(self) -> list[dict]:
+        return await self._request("GET", "/states") or []
+
     async def get_state(self, entity_id: str) -> dict | None:
         if not entity_id:
             return None

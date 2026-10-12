@@ -143,7 +143,7 @@ class MqttBridge:
 
     def _device(self) -> dict:
         return {"identifiers": [PREFIX], "name": DEVICE_NAME, "manufacturer": "Solar Charger Net Balancer",
-                "model": "Addon Home Assistant", "sw_version": "0.1.1"}
+                "model": "Addon Home Assistant", "sw_version": "0.2.0"}
 
     def _discovery(self, entity: Entity) -> dict:
         payload: dict[str, Any] = {
@@ -163,6 +163,20 @@ class MqttBridge:
         if entity.key in self._number_limits:
             payload["min"], payload["max"] = self._number_limits[entity.key]
         return payload
+
+    def set_number_limits(self, limits: dict[str, tuple[float, float]]) -> None:
+        """Actualiza los límites de las entidades number y vuelve a publicar su descubrimiento."""
+        if limits == self._number_limits:
+            return
+        self._number_limits = dict(limits)
+        if self._client.is_connected():
+            for key in limits:
+                entity = BY_KEY[key]
+                topic = f"{DISCOVERY}/{entity.component}/{PREFIX}/{entity.key}/config"
+                self._client.publish(topic, json.dumps(self._discovery(entity)), retain=True)
+
+    def publish_unconfigured(self, reason: str | None) -> None:
+        self.publish_state("mode", "Sin configurar", {"motivo": reason})
 
     def _handle_connect(self, client, userdata, flags, reason_code, properties):
         if reason_code.is_failure:

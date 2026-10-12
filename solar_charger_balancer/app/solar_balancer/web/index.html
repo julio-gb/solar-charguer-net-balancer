@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Solar Charger · Configuración</title>
+<style>
+:root{
+  --bg:#f3f5f4;--card:#fff;--fg:#1b2420;--muted:#5f6d66;--line:#dde3df;--soft:#f6f8f7;
+  --accent:#0f8f7e;--accent-fg:#fff;--sun:#c77700;--bad:#c2413a;--bad-soft:#f9e3e1;--ok:#2e8b4a;--ok-soft:#e1f2e5;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#111614;--card:#1a201d;--fg:#e7ece9;--muted:#97a59e;--line:#2b3430;--soft:#212825;
+  --accent:#3cc4b0;--accent-fg:#0d1513;--sun:#f2a93b;--bad:#ef7b73;--bad-soft:#3d1c1a;--ok:#5cc27a;--ok-soft:#173222;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:860px;margin:0 auto;padding:16px 16px 96px;display:grid;gap:16px}
+h1{font-size:1.35rem;margin:0}
+h2{font-size:.8rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:0}
+.sub{color:var(--muted);margin:2px 0 0}
+.banner{padding:10px 14px;border-radius:10px;font-weight:600}
+.banner.ok{background:var(--ok-soft);color:var(--ok)}
+.banner.bad{background:var(--bad-soft);color:var(--bad)}
+section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:14px}
+.field{display:grid;gap:4px;min-width:0}
+.field label{font-weight:600}
+.help{font-size:.8rem;color:var(--muted)}
+.err{font-size:.8rem;color:var(--bad);font-weight:600}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+select,input{font:inherit;color:var(--fg);background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;min-width:0}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.invalid{border-color:var(--bad)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.unit{display:flex;align-items:center;gap:6px}.unit span{color:var(--muted);white-space:nowrap}
+.toggle{font-size:.8rem;color:var(--muted);display:flex;gap:6px;align-items:center;font-weight:400}
+.toggle input{width:auto}
+button{font:inherit;font-weight:600;border-radius:8px;padding:8px 14px;cursor:pointer;border:1px solid var(--line);background:var(--soft);color:var(--fg)}
+button.primary{background:var(--accent);color:var(--accent-fg);border-color:transparent}
+button.icon{padding:6px 10px}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:480px}
+th{font-size:.75rem;text-align:left;color:var(--muted);font-weight:600;padding:4px}
+td{padding:4px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:3px 4px 3px 10px;font-variant-numeric:tabular-nums}
+.chip button{padding:0 8px;border:0;background:transparent;color:var(--muted)}
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:12px 16px}
+.bar .in{max-width:860px;margin:0 auto;display:flex;gap:12px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+#msg{margin-right:auto;font-weight:600}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Solar Charger · Configuración</h1>
+    <p class="sub">Los cambios se aplican al guardar, sin reiniciar el addon.</p>
+  </header>
+  <div id="status" class="banner" hidden></div>
+  <div id="form"><p class="sub">Cargando…</p></div>
+</main>
+<div class="bar"><div class="in"><span id="msg" role="status"></span><button id="reload" type="button">Descartar cambios</button><button id="save" class="primary" type="button">Guardar</button></div></div>
+
+<script>
+(() => {
+  const $ = (sel, el = document) => el.querySelector(sel);
+  const h = (tag, attrs = {}, ...kids) => {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === "class") e.className = v;
+      else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+      else if (v !== undefined && v !== null && v !== false) e.setAttribute(k, v === true ? "" : v);
+    }
+    for (const k of kids.flat()) if (k !== null && k !== undefined) e.append(k.nodeType ? k : document.createTextNode(k));
+    return e;
+  };
+  const api = (path, opts) => fetch(path, opts).then(async r => ({ ok: r.ok, data: await r.json().catch(() => ({})) }));
+
+  let schema = [], values = {}, entities = [];
+
+  function matches(f, e) {
+    const domain = e.entity_id.split(".")[0];
+    if (!f.domains.includes(domain)) return false;
+    if (!f.units.length && !f.device_classes.length) return true;
+    const unit = e.unit.toLowerCase();
+    return f.units.some(u => u.toLowerCase() === unit) || (f.device_classes.includes(e.device_class) && !f.units.length);
+  }
+
+  function entityField(f) {
+    const select = h("select", { id: f.key });
+    const all = h("input", { type: "checkbox" });
+    const fill = () => {
+      const current = values[f.key] || "";
+      const list = entities.filter(e => all.checked ? f.domains.includes(e.entity_id.split(".")[0]) : matches(f, e));
+      select.replaceChildren(h("option", { value: "" }, f.required ? "— Selecciona —" : "— Ninguna —"));
+      if (current && !list.some(e => e.entity_id === current)) list.unshift({ entity_id: current, name: current + " (no encontrada)", state: "", unit: "" });
+      for (const e of list) {
+        const label = `${e.name} · ${e.state ?? ""} ${e.unit}`.trim();
+        select.append(h("option", { value: e.entity_id, selected: e.entity_id === current }, `${label}  (${e.entity_id})`));
+      }
+    };
+    select.addEventListener("change", () => values[f.key] = select.value);
+    all.addEventListener("change", fill);
+    fill();
+    const count = entities.filter(e => matches(f, e)).length;
+    return [select, h("label", { class: "toggle" }, all, `Mostrar todas (${count} coinciden con el filtro)`)];
+  }
+
+  function numberField(f) {
+    const input = h("input", { id: f.key, type: "number", min: f.min, max: f.max, step: f.step, value: values[f.key] ?? "", inputmode: "decimal" });
+    input.addEventListener("input", () => values[f.key] = input.value === "" ? "" : Number(input.value));
+    return [h("div", { class: "unit" }, input, f.unit ? h("span", {}, f.unit) : null)];
+  }
+
+  function selectField(f) {
+    const s = h("select", { id: f.key }, f.options.map(o => h("option", { value: o, selected: values[f.key] === o }, o)));
+    s.addEventListener("change", () => values[f.key] = s.value);
+    return [s];
+  }
+
+  function datesField(f) {
+    const box = h("div", { class: "chips" });
+    const render = () => box.replaceChildren(...(values[f.key] || []).slice().sort().map(d =>
+      h("span", { class: "chip" }, new Date(d + "T00:00").toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short", year: "numeric" }),
+        h("button", { type: "button", "aria-label": "Quitar " + d, onclick: () => { values[f.key] = values[f.key].filter(x => x !== d); render(); } }, "×"))));
+    const input = h("input", { type: "date", id: f.key, style: "max-width:200px" });
+    const add = h("button", { type: "button", onclick: () => {
+      if (!input.value) return;
+      values[f.key] = [...new Set([...(values[f.key] || []), input.value])];
+      input.value = ""; render();
+    } }, "Añadir");
+    render();
+    return [h("div", { class: "row" }, input, add), box];
+  }
+
+  function tariffsField(f) {
+    const body = h("tbody");
+    const rows = () => values[f.key] || (values[f.key] = []);
+    const render = () => body.replaceChildren(...rows().map((r, i) => {
+      const set = (k, cast = v => v) => ev => { r[k] = cast(ev.target.value); };
+      return h("tr", {},
+        h("td", {}, h("select", { "aria-label": "Tipo de día", onchange: set("days") },
+          ["laborable", "festivo"].map(o => h("option", { value: o, selected: r.days === o }, o === "laborable" ? "Laborable" : "Festivo")))),
+        h("td", {}, h("input", { value: r.start, placeholder: "00:00", "aria-label": "Inicio", oninput: set("start"), style: "width:84px" })),
+        h("td", {}, h("input", { value: r.end, placeholder: "24:00", "aria-label": "Fin", oninput: set("end"), style: "width:84px" })),
+        h("td", {}, h("div", { class: "unit" }, h("input", { type: "number", step: "0.0001", min: "0", value: r.price, "aria-label": "Precio", oninput: set("price", Number), style: "width:110px" }), h("span", {}, "€/kWh"))),
+        h("td", {}, h("button", { type: "button", class: "icon", "aria-label": "Eliminar tramo", onclick: () => { rows().splice(i, 1); render(); } }, "×")));
+    }));
+    render();
+    const add = h("button", { type: "button", onclick: () => { rows().push({ days: "laborable", start: "", end: "", price: 0 }); render(); } }, "Añadir tramo");
+    const sort = h("button", { type: "button", onclick: () => { rows().sort((a, b) => a.days.localeCompare(b.days) || a.start.localeCompare(b.start)); render(); } }, "Ordenar");
+    return [h("div", { class: "tbl" }, h("table", {}, h("thead", {}, h("tr", {}, ["Día", "Inicio", "Fin", "Precio", ""].map(t => h("th", {}, t)))), body)), h("div", { class: "row" }, add, sort)];
+  }
+
+  const builders = { entity: entityField, int: numberField, float: numberField, select: selectField, dates: datesField, tariffs: tariffsField };
+
+  function render() {
+    const form = $("#form");
+    form.replaceChildren(...schema.map(section => {
+      const wide = section.fields.filter(f => ["entity", "tariffs", "dates"].includes(f.type));
+      const small = section.fields.filter(f => !wide.includes(f));
+      const field = f => h("div", { class: "field", "data-key": f.key },
+        h("label", { for: f.key }, f.label + (f.type === "entity" && f.required ? " *" : "")),
+        ...builders[f.type](f),
+        f.help ? h("span", { class: "help" }, f.help) : null,
+        h("span", { class: "err", hidden: true }));
+      return h("section", {}, h("h2", {}, section.title), ...wide.map(field), small.length ? h("div", { class: "grid2" }, small.map(field)) : null);
+    }));
+    form.style.display = "grid"; form.style.gap = "16px";
+  }
+
+  function showStatus(st) {
+    const el = $("#status");
+    el.hidden = false;
+    el.className = "banner " + (st.configured ? "ok" : "bad");
+    el.textContent = st.configured ? `En marcha · ${st.mode || ""}` : `Sin configurar: ${st.error || "completa los campos obligatorios"}`;
+  }
+
+  function showErrors(errors = {}, general = "") {
+    document.querySelectorAll(".field").forEach(f => {
+      const msg = errors[f.dataset.key];
+      const err = $(".err", f);
+      err.hidden = !msg; err.textContent = msg || "";
+      f.querySelectorAll("input,select").forEach(i => i.classList.toggle("invalid", !!msg));
+    });
+    $("#msg").style.color = general || Object.keys(errors).length ? "var(--bad)" : "var(--ok)";
+    $("#msg").textContent = general || (Object.keys(errors).length ? "Revisa los campos marcados." : "");
+    const first = document.querySelector(".field .err:not([hidden])");
+    if (first) first.closest(".field").scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  async function load() {
+    $("#msg").textContent = "";
+    const [s, v, e] = await Promise.all([api("api/schema"), api("api/settings"), api("api/entities")]);
+    schema = s.data.sections || [];
+    values = structuredClone(v.data.values || {});
+    entities = e.data.entities || [];
+    if (!e.ok) $("#msg").textContent = e.data.error || "No se pudieron cargar las entidades.";
+    showStatus(v.data.status || {});
+    render();
+  }
+
+  $("#save").addEventListener("click", async () => {
+    $("#save").disabled = true;
+    $("#msg").style.color = "var(--muted)"; $("#msg").textContent = "Guardando…";
+    const r = await api("api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) });
+    $("#save").disabled = false;
+    if (!r.ok) return showErrors(r.data.errors, r.data.error);
+    showErrors();
+    $("#msg").textContent = "Guardado y aplicado.";
+    const st = await api("api/settings");
+    showStatus(st.data.status || {});
+  });
+  $("#reload").addEventListener("click", load);
+  load();
+})();
+</script>
+</body>
+</html>
