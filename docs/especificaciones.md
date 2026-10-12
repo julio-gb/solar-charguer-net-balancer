@@ -111,10 +111,12 @@ Tarifa actual de referencia: Octopus 3 (fecha final 10/01/2027).
 - Ahorro estimado (€) según tarifa y compensación configuradas.
 - Controles: carga forzada (inicio, duración, intensidad, cancelar), activar/desactivar addon.
 - Incidencias: últimas desconexiones del cargador y log de decisiones.
-- Pendiente: Lovelace nativo vs. tarjetas HACS; uso principal (móvil/escritorio).
+- Lovelace con tarjetas HACS (ApexCharts, Mushroom; instalación a verificar).
+- Uso en móvil y escritorio: diseño responsive.
+- Maqueta visual previa para validación.
 
-## 9. Arquitectura (decisión pendiente)
-- Exposición de entidades del addon en HA: MQTT Discovery (requiere broker Mosquitto) u otra alternativa.
+## 9. Arquitectura
+- Exposición de entidades del addon en HA: MQTT Discovery (broker Mosquitto ya instalado).
 
 ## 10. Riesgos / mejoras posibles
 - Potencia FV pequeña (máx. ~1,8 kW) frente al mínimo de carga (1,4 kW): el excedente rara vez supera 1,4 kW de forma continua; el balance horario (carga a 6 A durante parte de la hora) es clave.
