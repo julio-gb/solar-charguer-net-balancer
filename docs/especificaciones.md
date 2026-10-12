@@ -43,7 +43,14 @@ Tarifa actual de referencia: Octopus 3 (fecha final 10/01/2027).
 - Objetivo del usuario: autoconsumir toda la generación posible.
 - Requisitos: tramos horarios editables, distinción laborable/festivo, precio de compensación editable, potencia contratada editable.
 
-## 4. Riesgos / mejoras posibles
+## 4. Objetivos
+- Autoconsumir toda la generación posible.
+- Alcanzar ≥ 60 % del consumo cubierto directamente por solar (ventajas fiscales). Umbral parametrizable.
+  - Pendiente: definición exacta del indicador, periodo de cálculo y fuente de datos oficial.
+  - Propuesta: el addon publica en HA un sensor con el % acumulado y su tendencia.
+  - Implicación: cada kWh cargado de red (también de noche) reduce el %.
+
+## 5. Riesgos / mejoras posibles
 - Exceso de potencia contratada: mitigado por el balanceo de carga del propio cargador (no es responsabilidad del addon).
 - Ahorro estimado por kWh cargado con solar en lugar de con red (sin impuestos): ~0,067 € frente a valle (0,087 − 0,02), ~0,099 € frente a 0,119 y ~0,178 € frente a 0,198.
 - Excedente < ~1,4 kW: no se puede cargar solo con solar (mínimo 6 A). Hay que decidir: pausar o completar con red.
