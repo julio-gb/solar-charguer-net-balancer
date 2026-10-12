@@ -102,9 +102,23 @@ Tarifa actual de referencia: Octopus 3 (fecha final 10/01/2027).
 - El balance horario usa contadores acumulados, por lo que tolera huecos de lectura sin perder energía.
 - Registro (log) de incidencias.
 
-## 8. Riesgos / mejoras posibles
+## 8. Dashboard de seguimiento (propuesta, pendiente de validar)
+- Estado actual: modo (solar / forzado / pausado / error), amperios, potencia FV, hogar, cargador, red.
+- Hora en curso: balance neto acumulado (Wh), previsión al cierre, minutos restantes.
+- Cobertura solar: hoy, mes, año (vs. objetivo 60 %), con proyección a fin de año.
+- Gráficos: generación vs. consumo (hogar + cargador) y balance por hora (día/semana/mes).
+- Energía cargada al coche: total y % solar; SoC estimado.
+- Ahorro estimado (€) según tarifa y compensación configuradas.
+- Controles: carga forzada (inicio, duración, intensidad, cancelar), activar/desactivar addon.
+- Incidencias: últimas desconexiones del cargador y log de decisiones.
+- Pendiente: Lovelace nativo vs. tarjetas HACS; uso principal (móvil/escritorio).
+
+## 9. Arquitectura (decisión pendiente)
+- Exposición de entidades del addon en HA: MQTT Discovery (requiere broker Mosquitto) u otra alternativa.
+
+## 10. Riesgos / mejoras posibles
 - Potencia FV pequeña (máx. ~1,8 kW) frente al mínimo de carga (1,4 kW): el excedente rara vez supera 1,4 kW de forma continua; el balance horario (carga a 6 A durante parte de la hora) es clave.
-- Objetivo del 60 % potencialmente inalcanzable con la instalación actual sin batería: validar con consumo anual del hogar y producción anual real.
+- Objetivo del 60 % potencialmente inalcanzable con la instalación actual sin batería: validar con consumo anual del hogar y producción anual real (datos no disponibles por ahora).
 - Comportamiento del ë-C4 ante paradas/arranques repetidos (posible que no reanude tras una pausa larga): validar en pruebas reales.
 - Invierno: entre 14:30 y la puesta de sol queda poco margen solar en laborables.
 - Los últimos minutos de cada hora dejan poco margen de corrección: aplicar margen de seguridad. Propuesta: en los últimos X min (parametrizable, p. ej. 10) solo se arranca si el excedente ya acumulado cubre la carga hasta el final de la hora.
