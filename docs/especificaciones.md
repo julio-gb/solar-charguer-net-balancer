@@ -46,7 +46,10 @@ Tarifa actual de referencia: Octopus 3 (fecha final 10/01/2027).
 ## 4. Objetivos
 - Autoconsumir toda la generación posible.
 - Alcanzar ≥ 60 % del consumo cubierto directamente por solar (ventajas fiscales). Umbral parametrizable.
-  - Pendiente: definición exacta del indicador, periodo de cálculo y fuente de datos oficial.
+  - Indicador: cobertura solar = energía solar autoconsumida / (consumo hogar + consumo cargador).
+    - Por intervalo: autoconsumo = mín(generación, hogar + cargador); red = máx(0, hogar + cargador − generación).
+  - Criterio: maximizar la cobertura solar minimizando la energía importada de red.
+  - Pendiente: periodo de cálculo y fuente de datos oficial.
   - Propuesta: el addon publica en HA un sensor con el % acumulado y su tendencia.
   - Implicación: cada kWh cargado de red (también de noche) reduce el %.
 
