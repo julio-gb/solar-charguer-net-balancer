@@ -5,8 +5,14 @@ configuration:
   generation_energy_entity: { name: Energía generada acumulada, description: "Contador de energía de las placas (kWh o Wh)." }
   home_energy_entity: { name: Energía del hogar acumulada, description: "Contador de energía del hogar sin cargador (kWh o Wh)." }
   charger_energy_entity: { name: Energía del cargador acumulada, description: "Contador de energía del cargador (kWh o Wh)." }
-  charger_switch_entity: { name: Interruptor del cargador, description: "Entidad switch que inicia/detiene la carga." }
-  charger_current_entity: { name: Intensidad del cargador, description: "Entidad number con la intensidad máxima (A)." }
+  charger_start_entity: { name: Iniciar carga, description: "Botón de iniciar carga o interruptor (switch) que inicia/detiene." }
+  charger_stop_entity: { name: Parar carga, description: "Botón de parar carga (no necesario con interruptor)." }
+  charger_state_entity: { name: Estado del cargador, description: "Sensor de estado (p. ej. charging, standby, unplugged)." }
+  charger_charging_states: { name: Estados «cargando» }
+  charger_unplugged_states: { name: Estados «coche desconectado» }
+  charger_current_entity: { name: Intensidad a enviar, description: "Entidad number donde se escribe la intensidad (A)." }
+  charger_current_apply_entity: { name: Botón enviar intensidad, description: "Se pulsa tras escribir la intensidad (opcional)." }
+  charger_current_readback_entity: { name: Intensidad actual, description: "Sensor con la intensidad aplicada (opcional)." }
   car_soc_entity: { name: Batería del coche (opcional), description: "Sensor de nivel de batería del coche (%)." }
   workday_entity: { name: Sensor de día laborable (opcional), description: "binary_sensor de la integración Workday; tiene prioridad sobre la lista de festivos." }
   voltage: { name: Tensión (V) }

@@ -18,6 +18,21 @@ Ahí también se editan tarifas, festivos y el resto de parámetros; al guardar 
 sin reiniciar. La pestaña «Configuración» del addon solo aporta los valores iniciales:
 lo guardado en la página tiene prioridad.
 
+## Cargador Beny WiFi (ejemplo)
+| Campo | Entidad |
+|---|---|
+| Iniciar carga | `button.<serie>_start_charging` |
+| Parar carga | `button.<serie>_stop_charging` |
+| Estado del cargador | `sensor.<serie>_charger_state` |
+| Estados «cargando» | `charging` |
+| Estados «coche desconectado» | `unplugged` |
+| Intensidad a enviar | `number.<serie>_max_current_control` |
+| Botón para enviar la intensidad | `button.<serie>_send_max_current` |
+| Intensidad actual | `sensor.<serie>_max_current` |
+
+Si paras la carga desde la app Z-Box con el control automático activado, el addon la
+volverá a iniciar si hay excedente. Desactiva «Control automático» para mandar tú.
+
 ## Cómo decide (cada 5 min por defecto)
 1. Calcula la energía de la hora en curso con los contadores acumulados.
 2. Disponible = saldo de la hora + (P. placas − P. hogar) × tiempo restante − margen.

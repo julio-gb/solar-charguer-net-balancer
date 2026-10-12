@@ -25,10 +25,10 @@ def test_check_accepts_defaults_and_coerces():
 
 def test_check_reports_field_errors():
     raw = default_options()
-    raw["charger_switch_entity"] = ""
+    raw["charger_start_entity"] = ""
     raw["min_current"] = 40
     _, errors = settings.check(raw)
-    assert set(errors) == {"charger_switch_entity", "min_current"}
+    assert set(errors) == {"charger_start_entity", "min_current"}
 
 
 def test_tariff_gaps_and_overlaps_rejected():
@@ -49,7 +49,7 @@ class FakeHA:
 
 async def _web_flow(tmp_path, monkeypatch):
     options = tmp_path / "options.json"
-    options.write_text(json.dumps(default_options() | {"charger_switch_entity": ""}))
+    options.write_text(json.dumps(default_options() | {"charger_start_entity": ""}))
     monkeypatch.setattr(settings, "OPTIONS_PATH", options)
     monkeypatch.setattr(settings, "SETTINGS_PATH", tmp_path / "settings.json")
     saved = []
@@ -64,7 +64,7 @@ async def _web_flow(tmp_path, monkeypatch):
         ents = (await (await s.get(base + "/api/entities")).json())["entities"]
         bad = await s.post(base + "/api/settings", json={"min_current": 3, "max_current": 2})
         bad_body = await bad.json()
-        ok = await s.post(base + "/api/settings", json={"charger_switch_entity": "switch.ev", "compensation_price": 0.03})
+        ok = await s.post(base + "/api/settings", json={"charger_start_entity": "switch.ev", "compensation_price": 0.03})
         ok_status = ok.status
     await runner.cleanup()
     return ents, bad.status, bad_body, ok_status, saved
@@ -73,10 +73,10 @@ async def _web_flow(tmp_path, monkeypatch):
 def test_web_endpoints(tmp_path, monkeypatch):
     ents, bad_status, bad_body, ok_status, saved = asyncio.run(_web_flow(tmp_path, monkeypatch))
     assert [e["entity_id"] for e in ents] == ["sensor.pv_power", "sensor.pv_energy"]  # sin light.*
-    assert bad_status == 400 and "charger_switch_entity" in bad_body["errors"]
+    assert bad_status == 400 and "charger_start_entity" in bad_body["errors"]
     assert ok_status == 200 and saved == [True]
     stored = json.loads((tmp_path / "settings.json").read_text())
-    assert stored["charger_switch_entity"] == "switch.ev" and stored["compensation_price"] == 0.03
+    assert stored["charger_start_entity"] == "switch.ev" and stored["compensation_price"] == 0.03
     assert settings.load_raw()["compensation_price"] == 0.03
 
 

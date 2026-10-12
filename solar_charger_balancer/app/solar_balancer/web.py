@@ -14,7 +14,7 @@ from .settings import SECTIONS, check, load_raw, save_raw, validate
 _LOGGER = logging.getLogger(__name__)
 INDEX = Path(__file__).with_name("web") / "index.html"
 INGRESS_IP = "172.30.32.2"
-ENTITY_DOMAINS = {"sensor", "binary_sensor", "switch", "input_boolean", "number", "input_number"}
+ENTITY_DOMAINS = {"sensor", "binary_sensor", "switch", "input_boolean", "number", "input_number", "button"}
 
 
 def _entity_summary(state: dict) -> dict:

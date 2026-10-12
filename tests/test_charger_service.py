@@ -2,7 +2,7 @@ import asyncio
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from solar_balancer.charger import Charger
+from solar_balancer.charger import Charger, ChargerEntities, ChargerReadings
 from solar_balancer.service import Balancer
 
 from helpers import make_config
@@ -41,18 +41,98 @@ def run(coro):
     return asyncio.run(coro)
 
 
+def _readings(ha, *ids):
+    return ChargerReadings(*(ha.states.get(i) if i else None for i in ids))
+
+
 def test_charger_reapplies_after_reconnect():
     ha = FakeHA()
     ha.set("switch.ev", "off")
     ha.set("number.ev", 6)
-    ch = Charger(ha, "switch.ev", "number.ev")
+    ch = Charger(ha, ChargerEntities(start="switch.ev", current="number.ev"))
     now = datetime(2026, 10, 10, 13, 0, tzinfo=TZ)
     ch.set_desired(True, 8)
-    assert ch.read(None, None, now) == "offline"
+    assert ch.read(ChargerReadings(), now) == ["offline"]
     assert run(ch.reconcile(now)) is None and ha.calls == []
-    assert ch.read(ha.states["switch.ev"], ha.states["number.ev"], now + timedelta(seconds=40)) == "online"
-    assert run(ch.reconcile(now + timedelta(seconds=40))) == "8 A, encender"
-    ch.read(ha.states["switch.ev"], ha.states["number.ev"], now)
+    assert ch.read(_readings(ha, "switch.ev", "number.ev"), now + timedelta(seconds=40)) == ["online"]
+    assert run(ch.reconcile(now + timedelta(seconds=40))) == "8 A, iniciar carga"
+    ch.read(_readings(ha, "switch.ev", "number.ev"), now)
+    assert ch.in_sync()
+
+
+BENY = ChargerEntities(start="button.b_start", stop="button.b_stop", current="number.b_cur",
+                       current_apply="button.b_send", current_readback="sensor.b_cur", state="sensor.b_state")
+
+
+class BenyHA(FakeHA):
+    """Simula la integración Beny: botones, número + botón enviar, sensor de estado."""
+
+    def __init__(self, state="standby", accepts=True):
+        super().__init__()
+        self.accepts = accepts
+        self.set("number.b_cur", 6)
+        self.set("sensor.b_cur", 6, "A")
+        self.set("sensor.b_state", state)
+
+    async def call_service(self, domain, service, data):
+        self.calls.append((domain, service, data["entity_id"]))
+        e = data["entity_id"]
+        if service == "set_value":
+            self.states[e]["state"] = str(data["value"])
+        elif e == "button.b_send":
+            self.states["sensor.b_cur"]["state"] = self.states["number.b_cur"]["state"]
+        elif e == "button.b_start" and self.accepts:
+            self.states["sensor.b_state"]["state"] = "charging"
+        elif e == "button.b_stop":
+            self.states["sensor.b_state"]["state"] = "standby"
+
+
+def beny_read(ha, ch, now):
+    return ch.read(_readings(ha, None, "number.b_cur", "sensor.b_cur", "sensor.b_state"), now)
+
+
+def test_beny_start_current_and_stop():
+    ha = BenyHA()
+    ch = Charger(ha, BENY)
+    now = datetime(2026, 10, 10, 13, 0, tzinfo=TZ)
+    beny_read(ha, ch, now)
+    ch.set_desired(True, 10)
+    assert run(ch.reconcile(now)) == "10 A, iniciar carga"
+    assert ha.calls == [("number", "set_value", "number.b_cur"), ("button", "press", "button.b_send"),
+                        ("button", "press", "button.b_start")]
+    beny_read(ha, ch, now)
+    assert ch.actual_on and ch.actual_current == 10 and ch.in_sync()
+    ch.set_desired(False, 10)
+    assert run(ch.reconcile(now)) == "parar carga"
+    beny_read(ha, ch, now)
+    assert ch.state_text == "standby" and ch.in_sync()
+
+
+def test_beny_unplugged_sends_nothing_and_full_battery_gives_up():
+    ha = BenyHA(state="unplugged")
+    ch = Charger(ha, BENY)
+    now = datetime(2026, 10, 10, 13, 0, tzinfo=TZ)
+    beny_read(ha, ch, now)
+    ch.set_desired(True, 6)
+    assert run(ch.reconcile(now)) is None and ha.calls == []
+    ha.states["sensor.b_state"]["state"] = "standby"
+    ha.accepts = False                          # coche lleno: no empieza a cargar
+    assert beny_read(ha, ch, now) == ["plugged"]
+    for i in range(5):
+        now += timedelta(minutes=6)
+        run(ch.reconcile(now))
+        beny_read(ha, ch, now)
+    presses = [c for c in ha.calls if c[2] == "button.b_start"]
+    assert len(presses) == 3 and ch.start_blocked and ch.in_sync()
+
+
+def test_buttons_without_state_sensor_track_last_command():
+    ha = BenyHA()
+    ch = Charger(ha, ChargerEntities(start="button.b_start", stop="button.b_stop", current="number.b_cur"))
+    now = datetime(2026, 10, 10, 13, 0, tzinfo=TZ)
+    ch.read(_readings(ha, None, "number.b_cur"), now)
+    ch.set_desired(True, 6)
+    assert run(ch.reconcile(now)) == "iniciar carga"
     assert ch.in_sync()
 
 
@@ -120,3 +200,23 @@ def test_state_roundtrip():
     b2, _ = make_balancer()
     b2.restore(b.snapshot(), b.now.t)
     assert b2.hour == b.hour and b2.counters["gen"].last == 1000.0
+
+
+def test_balancer_with_beny_waits_for_car_then_charges():
+    ha = BenyHA(state="unplugged")
+    for e, v, u in [("sensor.pv_power", 1.5, "kW"), ("sensor.home_power", 0.3, "kW"), ("sensor.ev_power", 0, "kW"),
+                    ("sensor.pv_energy", 10.0, "kWh"), ("sensor.home_energy", 5.0, "kWh"), ("sensor.ev_energy", 2.0, "kWh")]:
+        ha.set(e, v, u)
+    cfg = make_config(charger_start_entity="button.b_start", charger_stop_entity="button.b_stop",
+                      charger_current_entity="number.b_cur", charger_current_apply_entity="button.b_send",
+                      charger_current_readback_entity="sensor.b_cur", charger_state_entity="sensor.b_state")
+    b = Balancer(cfg, ha, TZ)
+    b.now = Clock(datetime(2026, 10, 10, 13, 0, 30, tzinfo=TZ))
+    run(b.poll())
+    assert b.mode == "Coche desconectado" and ha.calls == []
+    ha.states["sensor.b_state"]["state"] = "standby"
+    b.now.t += timedelta(seconds=30)
+    run(b.poll())
+    assert b.mode == "Solar · cargando"
+    assert ("button", "press", "button.b_start") in ha.calls
+    assert b.events[0]["text"].startswith("Arranque") and b.events[1]["text"] == "Coche conectado"

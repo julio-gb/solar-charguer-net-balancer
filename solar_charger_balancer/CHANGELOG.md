@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0
+- Soporte para cargadores con botones de iniciar/parar (p. ej. Beny WiFi), botón para
+  enviar la intensidad y sensor con la intensidad aplicada.
+- Sensor de estado del cargador: detecta si está cargando o si el coche está desconectado
+  (no se envían órdenes sin coche). Estados configurables.
+- Si el coche no inicia la carga tras 3 intentos (p. ej. batería llena) deja de insistir
+  hasta que cambie el estado del cargador.
+- La configuración anterior con un interruptor se migra automáticamente.
+
 ## 0.2.0
 - Página de configuración en el panel lateral de HA (Ingress): entidades en desplegables
   filtrados por unidad, editor de tramos de tarifa y festivos, y resto de parámetros.

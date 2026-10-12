@@ -7,7 +7,7 @@ from collections import deque
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from .charger import Charger
+from .charger import Charger, ChargerEntities, ChargerReadings
 from .config import Config
 from .controller import ControlInputs, ControlParams, decide, minutes_left_in_hour
 from .energy import CounterTracker, HourRecord, compute_stats
@@ -49,7 +49,11 @@ class Balancer:
             decision_interval_min=config.decision_interval_minutes, end_window_min=config.end_of_hour_window_minutes,
             margin_wh=config.safety_margin_wh, min_on_min=config.min_on_minutes, min_off_min=config.min_off_minutes,
         )
-        self.charger = Charger(ha, config.charger_switch_entity, config.charger_current_entity)
+        self.charger = Charger(ha, ChargerEntities(
+            start=config.charger_start_entity, current=config.charger_current_entity,
+            stop=config.charger_stop_entity, current_apply=config.charger_current_apply_entity,
+            current_readback=config.charger_current_readback_entity, state=config.charger_state_entity,
+            charging_states=config.charger_charging_states, unplugged_states=config.charger_unplugged_states))
         self.counters = {k: CounterTracker() for k in ("gen", "home", "ev")}
         self.records: list[HourRecord] = []
         self.hour: datetime | None = None
@@ -154,7 +158,7 @@ class Balancer:
         if key == "enabled":
             self.enabled = payload.upper() == "ON"
             if not self.enabled:
-                self.charger.desired_on = None
+                self.charger.release()
             self.event("Control automático " + ("activado" if self.enabled else "desactivado"))
             self.last_decision_at = None
         elif key == "forced_start":
@@ -212,8 +216,10 @@ class Balancer:
         c = self.cfg
         ids = [c.generation_power_entity, c.home_power_entity, c.charger_power_entity,
                c.generation_energy_entity, c.home_energy_entity, c.charger_energy_entity,
-               c.charger_switch_entity, c.charger_current_entity, c.car_soc_entity, c.workday_entity]
-        (p_gen, p_home, p_ev, e_gen, e_home, e_ev, sw, cur, soc, workday) = await asyncio.gather(*(self._read(i) for i in ids))
+               c.charger_start_entity, c.charger_current_entity, c.charger_current_readback_entity,
+               c.charger_state_entity, c.car_soc_entity, c.workday_entity]
+        (p_gen, p_home, p_ev, e_gen, e_home, e_ev, ch_start, ch_cur, ch_readback, ch_state, soc,
+         workday) = await asyncio.gather(*(self._read(i) for i in ids))
 
         self.powers = {"gen": to_float(p_gen), "home": to_float(p_home), "ev": to_float(p_ev)}
         self.workday_override = (workday["state"] == "on") if is_available(workday) else None
@@ -234,12 +240,23 @@ class Balancer:
             if self.soc.update_real(to_float(soc, unit_aware=False), stamp, self.ev_total):
                 self.event(f"Batería del coche (dato real): {to_float(soc, unit_aware=False):.0f} %")
 
-        await self._track_connectivity(self.charger.read(sw, cur, now), now)
+        changes = self.charger.read(ChargerReadings(ch_start, ch_cur, ch_readback, ch_state), now)
+        for change in changes:
+            if change == "plugged":
+                self.event("Coche conectado")
+                self.last_decision_at = None
+            elif change == "unplugged":
+                self.event("Coche desconectado")
+        await self._track_connectivity(next((c for c in changes if c in ("online", "offline")), None), now)
         await self._control(now)
 
         sent = await self.charger.reconcile(now)
         if sent:
-            _LOGGER.info("Orden enviada al cargador: %s", sent)
+            if self.charger.start_blocked:
+                self.event("El coche no inicia la carga tras varios intentos (¿batería llena?); "
+                           "se reintentará cuando cambie el estado del cargador", "warning")
+            else:
+                _LOGGER.info("Orden enviada al cargador: %s", sent)
         self.publish(now)
 
     def _allocate(self, key: str, delta: float, t0: datetime | None, t1: datetime) -> None:
@@ -300,7 +317,12 @@ class Balancer:
             return
         if not self.enabled:
             self.mode = "Manual (control desactivado)"
-            self.charger.desired_on = None
+            self.charger.release()
+            return
+        if not self.charger.car_connected:
+            self.mode = "Coche desconectado"
+            self.charger.set_desired(False, self.charger.desired_current or self.cfg.min_current)
+            self.decision = None
             return
 
         due = (self.last_decision_at is None or

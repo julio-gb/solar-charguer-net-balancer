@@ -25,8 +25,14 @@ class Config:
     generation_energy_entity: str
     home_energy_entity: str
     charger_energy_entity: str
-    charger_switch_entity: str
+    charger_start_entity: str
     charger_current_entity: str
+    charger_stop_entity: str = ""
+    charger_current_apply_entity: str = ""
+    charger_current_readback_entity: str = ""
+    charger_state_entity: str = ""
+    charger_charging_states: tuple[str, ...] = ("charging",)
+    charger_unplugged_states: tuple[str, ...] = ("unplugged",)
     car_soc_entity: str = ""
     workday_entity: str = ""
     voltage: int = 230
@@ -67,9 +73,13 @@ def parse_config(raw: dict) -> Config:
         "generation_energy_entity",
         "home_energy_entity",
         "charger_energy_entity",
-        "charger_switch_entity",
+        "charger_start_entity",
         "charger_current_entity",
     ]
+    raw = dict(raw)
+    # Compatibilidad con la v0.1/0.2 (un único interruptor).
+    if not str(raw.get("charger_start_entity") or "").strip() and raw.get("charger_switch_entity"):
+        raw["charger_start_entity"] = raw["charger_switch_entity"]
     missing = [key for key in required if not str(raw.get(key) or "").strip()]
     if missing:
         raise ConfigError(f"Faltan entidades obligatorias: {', '.join(missing)}")
@@ -90,8 +100,18 @@ def parse_config(raw: dict) -> Config:
 
     known = {f for f in Config.__dataclass_fields__}
     values = {k: v for k, v in raw.items() if k in known}
-    for key in ("car_soc_entity", "workday_entity"):
+    optional = ("car_soc_entity", "workday_entity", "charger_stop_entity", "charger_current_apply_entity",
+                "charger_current_readback_entity", "charger_state_entity")
+    for key in optional:
         values[key] = str(values.get(key) or "").strip()
+    start_domain = values["charger_start_entity"].split(".", 1)[0]
+    if start_domain == "button" and not values["charger_stop_entity"]:
+        raise ConfigError("Con un botón de iniciar carga hace falta también el botón de parar carga")
+    for key, default in (("charger_charging_states", ("charging",)), ("charger_unplugged_states", ("unplugged",))):
+        items = values.get(key, default)
+        if isinstance(items, str):
+            items = items.split(",")
+        values[key] = tuple(str(i).strip().lower() for i in items if str(i).strip())
     values["holidays"] = frozenset(date.fromisoformat(d) for d in raw.get("holidays") or [])
     values["tariff_periods"] = tuple(periods)
     return Config(**values)

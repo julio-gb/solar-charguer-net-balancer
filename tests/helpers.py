@@ -17,7 +17,7 @@ def default_options() -> dict:
         "generation_energy_entity": "sensor.pv_energy",
         "home_energy_entity": "sensor.home_energy",
         "charger_energy_entity": "sensor.ev_energy",
-        "charger_switch_entity": "switch.ev_charger",
+        "charger_start_entity": "switch.ev_charger",
         "charger_current_entity": "number.ev_current",
     })
     return options

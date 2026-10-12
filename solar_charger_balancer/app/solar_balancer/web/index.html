@@ -80,6 +80,7 @@ td{padding:4px}
   function matches(f, e) {
     const domain = e.entity_id.split(".")[0];
     if (!f.domains.includes(domain)) return false;
+    if (f.no_unit) return !e.unit;
     if (!f.units.length && !f.device_classes.length) return true;
     const unit = e.unit.toLowerCase();
     return f.units.some(u => u.toLowerCase() === unit) || (f.device_classes.includes(e.device_class) && !f.units.length);
@@ -151,7 +152,13 @@ td{padding:4px}
     return [h("div", { class: "tbl" }, h("table", {}, h("thead", {}, h("tr", {}, ["Día", "Inicio", "Fin", "Precio", ""].map(t => h("th", {}, t)))), body)), h("div", { class: "row" }, add, sort)];
   }
 
-  const builders = { entity: entityField, int: numberField, float: numberField, select: selectField, dates: datesField, tariffs: tariffsField };
+  function tagsField(f) {
+    const input = h("input", { id: f.key, value: (values[f.key] || []).join(", "), placeholder: "charging" });
+    input.addEventListener("input", () => values[f.key] = input.value);
+    return [input];
+  }
+
+  const builders = { entity: entityField, int: numberField, float: numberField, select: selectField, tags: tagsField, dates: datesField, tariffs: tariffsField };
 
   function render() {
     const form = $("#form");

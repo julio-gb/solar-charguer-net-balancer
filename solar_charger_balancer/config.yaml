@@ -1,5 +1,5 @@
 name: Solar Charger Balancer
-version: "0.2.0"
+version: "0.3.0"
 slug: solar_charger_balancer
 description: Carga el coche con los excedentes solares usando el balance neto horario.
 url: https://github.com/julio-gb/solar-charguer-net-balancer
@@ -24,8 +24,14 @@ options:
   generation_energy_entity: ""
   home_energy_entity: ""
   charger_energy_entity: ""
-  charger_switch_entity: ""
+  charger_start_entity: ""
+  charger_stop_entity: ""
+  charger_state_entity: ""
+  charger_charging_states: ["charging"]
+  charger_unplugged_states: ["unplugged"]
   charger_current_entity: ""
+  charger_current_apply_entity: ""
+  charger_current_readback_entity: ""
   car_soc_entity: ""
   workday_entity: ""
   voltage: 230
@@ -61,8 +67,16 @@ schema:
   generation_energy_entity: str?
   home_energy_entity: str?
   charger_energy_entity: str?
-  charger_switch_entity: str?
+  charger_start_entity: str?
+  charger_stop_entity: str?
+  charger_state_entity: str?
+  charger_charging_states:
+    - str
+  charger_unplugged_states:
+    - str
   charger_current_entity: str?
+  charger_current_apply_entity: str?
+  charger_current_readback_entity: str?
   car_soc_entity: str?
   workday_entity: str?
   voltage: int(100,400)

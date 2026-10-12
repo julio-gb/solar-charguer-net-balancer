@@ -17,7 +17,7 @@ def test_default_options_parse():
 
 def test_missing_entity_rejected():
     options = default_options()
-    options["charger_switch_entity"] = ""
+    options["charger_start_entity"] = ""
     with pytest.raises(ConfigError):
         parse_config(options)
 
@@ -37,3 +37,16 @@ def test_holiday_and_workday_sensor():
     tariff = Tariff(make_config(holidays=["2026-10-12"]))
     assert tariff.price_at(datetime(2026, 10, 12, 11, 0)) == 0.087
     assert tariff.price_at(datetime(2026, 10, 12, 11, 0), workday_override=True) == 0.198
+
+
+def test_button_start_requires_stop_and_old_switch_key_migrates():
+    options = default_options()
+    options["charger_start_entity"] = "button.b_start"
+    with pytest.raises(ConfigError):
+        parse_config(options)
+    options["charger_stop_entity"] = "button.b_stop"
+    options["charger_charging_states"] = "Charging, waiting"
+    assert parse_config(options).charger_charging_states == ("charging", "waiting")
+    old = default_options()
+    old["charger_switch_entity"] = old.pop("charger_start_entity")
+    assert parse_config(old).charger_start_entity == "switch.ev_charger"

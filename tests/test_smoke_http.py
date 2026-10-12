@@ -1,5 +1,6 @@
 """Prueba de humo: cliente HTTP real contra un HA simulado y publicación MQTT sin broker."""
 import asyncio
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import aiohttp
@@ -47,6 +48,8 @@ async def _scenario():
     async with aiohttp.ClientSession() as session:
         ha = HAClient(session, f"http://127.0.0.1:{port}/api", "token")
         balancer = Balancer(make_config(), ha, ZoneInfo("Europe/Madrid"))
+        # Hora fija al inicio de una hora: el resultado no depende del reloj real.
+        balancer.now = lambda: datetime(2026, 10, 10, 13, 0, 30, tzinfo=ZoneInfo("Europe/Madrid"))
         bridge = MqttBridge(asyncio.get_running_loop(), balancer.handle_command)
         bridge._client.publish = lambda topic, payload, retain=False: published.__setitem__(topic, payload)
         balancer.pub = bridge

@@ -18,9 +18,10 @@ POWER_UNITS = ["W", "kW", "MW"]
 ENERGY_UNITS = ["Wh", "kWh", "MWh"]
 
 
-def _entity(key, label, help_, domains, units=None, device_classes=None, required=True):
+def _entity(key, label, help_, domains, units=None, device_classes=None, required=True, no_unit=False):
     return {"key": key, "label": label, "help": help_, "type": "entity", "domains": domains,
-            "units": units or [], "device_classes": device_classes or [], "required": required}
+            "units": units or [], "device_classes": device_classes or [], "required": required,
+            "no_unit": no_unit}
 
 
 def _num(key, label, help_, kind, minimum, maximum, step, unit=""):
@@ -39,8 +40,14 @@ SECTIONS = [
     {"title": "Cargador", "fields": [
         _entity("charger_power_entity", "Potencia del cargador", "Potencia que consume el cargador.", ["sensor"], POWER_UNITS, ["power"]),
         _entity("charger_energy_entity", "Energía del cargador acumulada", "Contador de energía del cargador.", ["sensor"], ENERGY_UNITS, ["energy"]),
-        _entity("charger_switch_entity", "Interruptor de carga", "Inicia y detiene la carga.", ["switch", "input_boolean"]),
-        _entity("charger_current_entity", "Intensidad del cargador", "Intensidad máxima de carga.", ["number", "input_number"], ["A"], ["current"]),
+        _entity("charger_start_entity", "Iniciar carga", "Botón de iniciar carga, o un interruptor que inicia y detiene.", ["button", "switch", "input_boolean"]),
+        _entity("charger_stop_entity", "Parar carga", "Botón de parar carga. No hace falta si usas un interruptor.", ["button"], required=False),
+        _entity("charger_state_entity", "Estado del cargador", "Sensor de texto con el estado (cargando, desconectado…).", ["sensor"], required=False, no_unit=True),
+        {"key": "charger_charging_states", "label": "Estados que significan «cargando»", "help": "Valores del sensor de estado, separados por comas.", "type": "tags"},
+        {"key": "charger_unplugged_states", "label": "Estados que significan «coche desconectado»", "help": "Valores del sensor de estado, separados por comas.", "type": "tags"},
+        _entity("charger_current_entity", "Intensidad a enviar", "Entidad numérica donde se escribe la intensidad.", ["number", "input_number"], ["A"], ["current"]),
+        _entity("charger_current_apply_entity", "Botón para enviar la intensidad", "Opcional. Se pulsa después de escribir la intensidad.", ["button"], required=False),
+        _entity("charger_current_readback_entity", "Intensidad actual del cargador", "Opcional. Sensor con la intensidad que el cargador tiene aplicada.", ["sensor"], ["A"], ["current"], required=False),
         _num("voltage", "Tensión", "Tensión de la instalación.", "int", 100, 400, 1, "V"),
         _num("min_current", "Intensidad mínima", "Mínimo que admite el cargador.", "int", 1, 32, 1, "A"),
         _num("max_current", "Intensidad máxima", "Límite configurado en el cargador.", "int", 1, 32, 1, "A"),
@@ -89,6 +96,10 @@ def load_raw(options_path: Path | None = None, settings_path: Path | None = None
     """Configuración efectiva sin validar: opciones del addon + ajustes guardados."""
     raw = _read_json(options_path or OPTIONS_PATH)
     raw.update(_read_json(settings_path or SETTINGS_PATH))
+    # Compatibilidad con versiones anteriores (un único interruptor de carga).
+    if not raw.get("charger_start_entity") and raw.get("charger_switch_entity"):
+        raw["charger_start_entity"] = raw["charger_switch_entity"]
+    raw.pop("charger_switch_entity", None)
     return raw
 
 
@@ -130,6 +141,11 @@ def check(raw: dict) -> tuple[dict, dict[str, str]]:
                     if not f["min"] <= number <= f["max"]:
                         errors[key] = f"Debe estar entre {f['min']} y {f['max']}."
                     clean[key] = number
+                elif kind == "tags":
+                    items = value.split(",") if isinstance(value, str) else (value or [])
+                    clean[key] = [str(i).strip().lower() for i in items if str(i).strip()]
+                    if not clean[key]:
+                        errors[key] = "Indica al menos un valor."
                 elif kind == "select":
                     if value not in f["options"]:
                         errors[key] = "Valor no válido."
@@ -139,6 +155,9 @@ def check(raw: dict) -> tuple[dict, dict[str, str]]:
                     clean[key] = _check_tariffs(value or [])
             except (TypeError, ValueError) as err:
                 errors[key] = str(err) if isinstance(err, TariffError) else "Valor no válido."
+    start = clean.get("charger_start_entity", "")
+    if start.startswith("button.") and not clean.get("charger_stop_entity"):
+        errors["charger_stop_entity"] = "Con un botón de iniciar carga hace falta el botón de parar."
     if not errors and clean["max_current"] < clean["min_current"]:
         errors["max_current"] = "Debe ser mayor o igual que la intensidad mínima."
     return clean, errors
