@@ -38,14 +38,14 @@ Tarifa actual de referencia: Octopus 3 (fecha final 10/01/2027).
 | Fines de semana y festivos | 00:00–24:00 | 0,0870 |
 
 - Término de potencia: punta 0,0970 €/kW/día · valle 0,0270 €/kW/día.
-- Compensación de excedentes: ~0,07 €/kWh, con batería virtual (descuenta energía y potencia; no se pierden excedentes).
+- Compensación de excedentes: 0,02 €/kWh (parametrizable), con batería virtual (descuenta energía y potencia; no se pierden excedentes).
 - Precios sin impuestos.
 - Objetivo del usuario: autoconsumir toda la generación posible.
 - Requisitos: tramos horarios editables, distinción laborable/festivo, precio de compensación editable, potencia contratada editable.
 
 ## 4. Riesgos / mejoras posibles
 - Exceso de potencia contratada: mitigado por el balanceo de carga del propio cargador (no es responsabilidad del addon).
-- Ahorro marginal: con batería virtual, cargar con solar frente a cargar en valle ahorra ~0,017 €/kWh (0,087 − 0,07, sin impuestos).
+- Ahorro estimado por kWh cargado con solar en lugar de con red (sin impuestos): ~0,067 € frente a valle (0,087 − 0,02), ~0,099 € frente a 0,119 y ~0,178 € frente a 0,198.
 - Excedente < ~1,4 kW: no se puede cargar solo con solar (mínimo 6 A). Hay que decidir: pausar o completar con red.
 - Evitar arranques/paradas frecuentes (histéresis y tiempos mínimos) para proteger cargador y coche.
 - Resolución de 5 min: reacción lenta ante nubes o picos de consumo.
