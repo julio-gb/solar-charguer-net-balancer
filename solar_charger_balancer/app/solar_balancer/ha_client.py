@@ -16,6 +16,19 @@ class HAError(Exception):
     pass
 
 
+def supervisor_token() -> str:
+    """Token del Supervisor. Con s6-overlay el entorno del contenedor puede no heredarse,
+    así que también se lee del fichero donde s6 lo guarda."""
+    token = os.environ.get("SUPERVISOR_TOKEN", "")
+    if not token:
+        try:
+            with open("/run/s6/container_environment/SUPERVISOR_TOKEN", encoding="utf-8") as fh:
+                token = fh.read().strip()
+        except OSError:
+            token = ""
+    return token
+
+
 def to_float(state: dict | None, unit_aware: bool = True) -> float | None:
     """Valor numérico del estado, convertido a kW/kWh si la unidad es W/Wh/MW/MWh."""
     if not state or str(state.get("state", "")).lower() in UNAVAILABLE:
@@ -38,7 +51,7 @@ class HAClient:
     def __init__(self, session: aiohttp.ClientSession, base_url: str | None = None, token: str | None = None):
         self._session = session
         self._base = base_url or "http://supervisor/core/api"
-        token = token or os.environ.get("SUPERVISOR_TOKEN", "")
+        token = token or supervisor_token()
         self._headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
         self._timeout = aiohttp.ClientTimeout(total=15)
 
@@ -78,7 +91,7 @@ class HAClient:
 
 async def get_mqtt_service(session: aiohttp.ClientSession) -> dict:
     """Credenciales del broker MQTT (Mosquitto) que publica el Supervisor."""
-    token = os.environ.get("SUPERVISOR_TOKEN", "")
+    token = supervisor_token()
     async with session.get("http://supervisor/services/mqtt",
                            headers={"Authorization": f"Bearer {token}"},
                            timeout=aiohttp.ClientTimeout(total=15)) as resp:

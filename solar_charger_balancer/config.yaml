@@ -1,5 +1,5 @@
 name: Solar Charger Balancer
-version: "0.3.0"
+version: "0.3.1"
 slug: solar_charger_balancer
 description: Carga el coche con los excedentes solares usando el balance neto horario.
 url: https://github.com/julio-gb/solar-charguer-net-balancer

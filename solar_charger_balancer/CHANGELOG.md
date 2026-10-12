@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.3.1
+- Corrige el error 401 al arrancar: el proceso no recibía el token del Supervisor.
+
 ## 0.3.0
 - Soporte para cargadores con botones de iniciar/parar (p. ej. Beny WiFi), botón para
   enviar la intensidad y sensor con la intensidad aplicada.

@@ -11,7 +11,7 @@ import aiohttp
 from aiohttp import web
 
 from .config import Config, ConfigError
-from .ha_client import HAClient, HAError, get_mqtt_service
+from .ha_client import HAClient, HAError, get_mqtt_service, supervisor_token
 from .mqtt_bridge import MqttBridge
 from .service import Balancer
 from .settings import check, load_raw, validate
@@ -110,6 +110,8 @@ async def main() -> int:
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, stop.set)
 
+    if not supervisor_token():
+        _LOGGER.error("No se encuentra SUPERVISOR_TOKEN: el addon no puede comunicarse con Home Assistant")
     async with aiohttp.ClientSession() as session:
         ha = HAClient(session)
         ha_config = await _retry("Home Assistant", ha.get_config)
