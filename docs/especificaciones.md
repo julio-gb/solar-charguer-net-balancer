@@ -8,6 +8,7 @@
 | 2 | Potencia consumida por el hogar | kW | ~5 min |
 | 3 | Potencia consumida por el cargador del coche | kW | ~5 min |
 
+- Además, sensores de energía acumulada (kWh) para las tres métricas (generación, hogar, cargador), también seleccionables. Fuente principal para el balance horario.
 - Las entidades 2 y 3 son independientes: consumo total = hogar + cargador.
 - Excedente disponible = generación − consumo hogar.
 
@@ -49,7 +50,9 @@ Tarifa actual de referencia: Octopus 3 (fecha final 10/01/2027).
   - Indicador: cobertura solar = energía solar autoconsumida / (consumo hogar + consumo cargador).
     - Por hora de reloj (balance neto horario): autoconsumo_h = mín(E_generada_h, E_hogar_h + E_cargador_h); red_h = máx(0, E_hogar_h + E_cargador_h − E_generada_h).
   - Criterio: maximizar la cobertura solar minimizando la energía importada de red.
-  - Pendiente: periodo de cálculo y fuente de datos oficial.
+  - Periodo: anual. Cobertura anual = Σ autoconsumo_h / Σ (E_hogar_h + E_cargador_h).
+  - El addon debe guardar el histórico horario para calcularla (persistente ante reinicios).
+  - Pendiente: ¿año natural o año móvil? Fuente de datos oficial.
   - Propuesta: el addon publica en HA un sensor con el % acumulado y su tendencia.
   - Implicación: cada kWh cargado de red (también de noche) reduce el %.
 
@@ -57,7 +60,7 @@ Tarifa actual de referencia: Octopus 3 (fecha final 10/01/2027).
 - Balance neto horario: lo que cuenta es la energía neta de cada hora de reloj (hh:00–hh:59), no la potencia instantánea.
 - Ciclo de decisión: cada 5 min (ritmo de las entidades más lentas).
 - En cada ciclo el addon:
-  1. Integra la energía acumulada en la hora: generación, hogar y cargador.
+  1. Calcula la energía de la hora en curso (generación, hogar, cargador) como diferencia de los sensores de energía acumulada respecto al inicio de la hora.
   2. Estima la energía que falta generar/consumir hasta el final de la hora.
   3. Decide arrancar, parar o ajustar amperios (6–21 A) para que el balance de la hora acabe ≥ 0 y lo más cerca posible de 0.
 - Excedente < 1,4 kW: permitido cargar a 6 A durante parte de la hora (p. ej. 0,7 kW de excedente → ~30 min a 1,4 kW), siempre que el balance horario cierre sin importar de red.
@@ -65,8 +68,7 @@ Tarifa actual de referencia: Octopus 3 (fecha final 10/01/2027).
 - Parámetros: tiempo mínimo encendido/apagado, margen de seguridad (Wh), umbral de cobertura.
 
 ## 6. Riesgos / mejoras posibles
-- Integrar energía con muestras cada 5 min introduce error; preferible usar sensores de energía acumulada (kWh) si existen.
-- Los últimos minutos de cada hora dejan poco margen de corrección: aplicar margen de seguridad.
+- Los últimos minutos de cada hora dejan poco margen de corrección: aplicar margen de seguridad. Propuesta: en los últimos X min (parametrizable, p. ej. 10) solo se arranca si el excedente ya acumulado cubre la carga hasta el final de la hora.
 - Exceso de potencia contratada: mitigado por el balanceo de carga del propio cargador (no es responsabilidad del addon).
 - Ahorro estimado por kWh cargado con solar en lugar de con red (sin impuestos): ~0,067 € frente a valle (0,087 − 0,02), ~0,099 € frente a 0,119 y ~0,178 € frente a 0,198.
 - Excedente < ~1,4 kW: no se puede cargar solo con solar (mínimo 6 A). Hay que decidir: pausar o completar con red.
