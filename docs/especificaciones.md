@@ -16,8 +16,8 @@
 - Cargador: Velo HOME-I, modelo BCP-A2N-L. Monofásico. Conectado a la red local.
   - Integración HA: Beny WiFi (app móvil: Z-Box).
   - Control desde HA: encendido/apagado y amperaje máximo.
-  - Rango de intensidad: 6 A (mínimo del cargador) – 26 A (límite configurado).
-  - Equivalencia aprox. a 230 V: 6 A ≈ 1,4 kW · 26 A ≈ 6,0 kW · 1 A ≈ 0,23 kW.
+  - Rango de intensidad: 6 A (mínimo del cargador) – 21 A (límite configurado).
+  - Equivalencia aprox. a 230 V: 6 A ≈ 1,4 kW · 21 A ≈ 4,8 kW · 1 A ≈ 0,23 kW.
   - Su sensor de potencia lo proporciona el propio cargador (posible actualización más rápida, pendiente confirmar).
 
 - Sin batería doméstica.
@@ -42,7 +42,7 @@ Tarifa actual de referencia: Octopus 3 (fecha final 10/01/2027).
 - Requisitos: tramos horarios editables, distinción laborable/festivo, precio de compensación editable, potencia contratada editable.
 
 ## 4. Riesgos / mejoras posibles
-- Cargador a 26 A (~6 kW) supera la potencia contratada (4,9 kW): el addon debe limitar la intensidad para no superar la potencia contratada (consumo de red = hogar + cargador − generación).
+- Cargador a 21 A (~4,8 kW) + consumo del hogar puede superar la potencia contratada (4,9 kW): el addon debe limitar la intensidad para no superar la potencia contratada (consumo de red = hogar + cargador − generación).
 - Excedente < ~1,4 kW: no se puede cargar solo con solar (mínimo 6 A). Hay que decidir: pausar o completar con red.
 - Evitar arranques/paradas frecuentes (histéresis y tiempos mínimos) para proteger cargador y coche.
 - Resolución de 5 min: reacción lenta ante nubes o picos de consumo.
