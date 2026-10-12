@@ -76,6 +76,10 @@ Tarifa actual de referencia: Octopus 3 (fecha final 10/01/2027).
 - Ejemplo: esta noche desde las 00:00 durante 4 h a 21 A.
 - Controlable desde HA (entidades del addon: activar/cancelar, inicio, duración, intensidad).
 - La energía de red consumida computa en la cobertura anual.
+- Programación puntual (no recurrente): se introduce desde HA cuando se necesita y se elimina al terminar.
+- Hora de fin fija: si hay desconexiones durante la carga, NO se recupera el tiempo perdido (el cargador sigue cargando aunque pierda la conexión WiFi).
+- La programación debe persistir ante reinicios de HA/addon.
+- Al terminar o cancelarse, el addon vuelve al modo solar.
 
 ## 7. Gestión de errores: desconexión del cargador
 - Contexto: cobertura WiFi deficiente, microcortes frecuentes.
