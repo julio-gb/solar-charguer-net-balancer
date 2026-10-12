@@ -13,6 +13,7 @@
 
 ## 2. Hardware
 - Inversor: Huawei. Datos obtenidos vía nube FusionSolar (perfil de solo consulta), resolución ~5 min.
+- Cargador: conectado a la red local; su sensor de potencia lo proporciona el propio cargador (posible actualización más rápida, pendiente confirmar).
 
 ## 3. Riesgos / mejoras posibles
 - Resolución de 5 min: reacción lenta ante nubes o picos de consumo.
