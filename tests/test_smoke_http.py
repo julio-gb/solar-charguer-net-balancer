@@ -47,7 +47,7 @@ async def _scenario():
     published = {}
     async with aiohttp.ClientSession() as session:
         ha = HAClient(session, f"http://127.0.0.1:{port}/api", "token")
-        balancer = Balancer(make_config(), ha, ZoneInfo("Europe/Madrid"))
+        balancer = Balancer(make_config(strategy="prevision", surplus_factor=1.0), ha, ZoneInfo("Europe/Madrid"))
         # Hora fija al inicio de una hora: el resultado no depende del reloj real.
         balancer.now = lambda: datetime(2026, 10, 10, 13, 0, 30, tzinfo=ZoneInfo("Europe/Madrid"))
         bridge = MqttBridge(asyncio.get_running_loop(), balancer.handle_command)

@@ -93,3 +93,11 @@ def test_ingress_only(tmp_path):
         await runner.cleanup()
         return status
     assert asyncio.run(flow()) == 403
+
+
+def test_missing_new_fields_get_defaults():
+    raw = default_options()
+    for k in ("strategy", "surplus_factor", "home_includes_charger", "charger_charging_states"):
+        raw.pop(k, None)
+    clean, errors = settings.check(raw)
+    assert errors == {} and clean["strategy"] == "acumulado" and clean["charger_charging_states"] == ["charging"]

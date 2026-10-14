@@ -34,12 +34,18 @@ Si paras la carga desde la app Z-Box con el control automático activado, el add
 volverá a iniciar si hay excedente. Desactiva «Control automático» para mandar tú.
 
 ## Cómo decide (cada 5 min por defecto)
-1. Calcula la energía de la hora en curso con los contadores acumulados.
-2. Disponible = saldo de la hora + (P. placas − P. hogar) × tiempo restante − margen.
-3. Si el disponible permite ≥ 6 A hasta el final de la hora, ajusta la intensidad (6–21 A).
-4. Si no, carga a 6 A mientras el saldo lo permita y pausa para que la hora cierre ≥ 0.
-5. En los últimos minutos (10 por defecto) solo arranca si el saldo **ya acumulado** cubre la carga.
-6. Respeta tiempos mínimos de encendido/apagado para no hacer ciclos continuos.
+**Estrategia «acumulado» (recomendada):** solo carga con la energía ya vertida en la hora en
+curso, más una parte prudente del excedente actual (factor 0,5 por defecto) durante el
+siguiente ciclo. Al empezar cada hora espera a acumular saldo; nunca carga a cuenta de sol
+futuro, así que tolera datos atrasados y tardes con producción decreciente.
+
+**Estrategia «prevision»:** cuenta también con el excedente actual hasta el final de la hora.
+Carga antes, pero puede importar si el sol baja o la casa consume más de lo previsto.
+
+En ambas:
+- La intensidad se ajusta entre la mínima y la máxima para que la hora cierre con saldo ≥ 0.
+- En los últimos minutos (10 por defecto) solo arranca si el saldo ya acumulado cubre la carga.
+- Se respetan tiempos mínimos de encendido/apagado.
 
 Las lecturas que llegan tarde tras el cambio de hora se reparten entre la hora anterior y
 la nueva según su marca de tiempo (la hora anterior se cierra 10 min después).
@@ -60,6 +66,11 @@ El interruptor **Control automático** permite desactivar el addon sin pararlo; 
 está apagado no envía órdenes al cargador (la carga forzada programada sí se ejecuta).
 Si cambias la carga desde la app Z-Box con el control activado, el addon volverá a
 aplicar su propio estado en el siguiente ciclo.
+
+## Diagnóstico
+En la página de configuración, **Descargar diagnóstico** genera un JSON con la configuración,
+las horas cerradas de los últimos 14 días, los eventos y la traza de cada decisión (lecturas,
+saldo, motivo, orden enviada y estado del cargador).
 
 ## Datos que guarda
 `/data/state.json`: histórico horario (≈ 400 días), configuración de la carga forzada,

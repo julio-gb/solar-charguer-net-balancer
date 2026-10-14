@@ -1,9 +1,11 @@
+from dataclasses import replace
 from datetime import datetime, timedelta
 
 from solar_balancer.controller import ControlInputs, ControlParams, decide
 
-P = ControlParams(voltage=230, min_current=6, max_current=21, decision_interval_min=5,
-                  end_window_min=10, margin_wh=50, min_on_min=5, min_off_min=5)
+A = ControlParams(voltage=230, min_current=6, max_current=21, decision_interval_min=5,
+                  end_window_min=10, margin_wh=50, min_on_min=5, min_off_min=5)   # acumulado (defecto)
+P = replace(A, strategy="prevision", surplus_factor=1.0)
 T0 = datetime(2026, 10, 10, 13, 0)
 
 
@@ -58,3 +60,50 @@ def test_simulated_hour_closes_without_import():
         ev += (amps * 0.23 if charging else 0.0) * step
     assert ev > 0.3
     assert gen - home - ev >= 0
+
+
+# ---------------------------------------------------------------- estrategia «acumulado»
+def test_accumulated_waits_for_balance_at_hour_start():
+    assert not decide(inp(gen_kw=1.5, home_kw=0.3), A).charge          # saldo 0: espera
+
+
+def test_accumulated_charges_once_balance_exists():
+    d = decide(inp(minute=15, gen=0.45, home=0.08, gen_kw=1.5, home_kw=0.3), A)
+    assert d.charge and d.current_a >= 6
+
+
+def simulate(params, sun, home_kw):
+    """Hora simulada en pasos de 5 min con producción y consumo variables. Devuelve (saldo, coche)."""
+    gen = home = ev = 0.0
+    charging, amps, last = False, 6, None
+    for i, minute in enumerate(range(0, 60, 5)):
+        # El addon ve los datos con 5 min de retraso (FusionSolar).
+        seen_gen, seen_home = sun[max(0, i - 1)], home_kw[max(0, i - 1)]
+        d = decide(inp(minute, gen, home, ev, seen_gen, seen_home, charging, amps, last), params)
+        if d.charge != charging:
+            last = T0 + timedelta(minutes=minute)
+        charging, amps = d.charge, d.current_a
+        step = 5 / 60
+        gen += sun[i] * step
+        home += home_kw[i] * step
+        ev += (amps * 0.23 if charging else 0.0) * step
+    return gen - home - ev, ev
+
+
+AFTERNOON_SUN = [1.2, 1.15, 1.1, 1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.45, 0.4, 0.35]
+COOKING = [0.3, 2.0, 2.2, 1.5, 0.4, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3]
+
+
+def test_afternoon_with_cooking_accumulated_never_imports():
+    balance, ev = simulate(A, AFTERNOON_SUN, COOKING)
+    assert balance >= 0
+
+
+def test_afternoon_with_cooking_forecast_can_import():
+    balance, _ = simulate(P, AFTERNOON_SUN, COOKING)
+    assert balance < 0          # el problema observado el 14/10
+
+
+def test_accumulated_still_charges_on_steady_surplus():
+    balance, ev = simulate(A, [1.5] * 12, [0.3] * 12)
+    assert balance >= 0 and ev > 0.6

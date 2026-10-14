@@ -63,6 +63,11 @@ class Runner:
             return {"configured": True, "mode": self.balancer.mode}
         return {"configured": False, "error": self.error}
 
+    def diagnostics(self) -> dict:
+        if self.balancer:
+            return self.balancer.diagnostics()
+        return {"modo": "Sin configurar", "error": self.error}
+
     def reload(self) -> None:
         self.restart.set()
 
@@ -124,7 +129,7 @@ async def main() -> int:
         bridge.connect(mqtt_conf.get("host", "core-mosquitto"), int(mqtt_conf.get("port", 1883)),
                        mqtt_conf.get("username"), mqtt_conf.get("password"))
 
-        app = create_app(ha, runner.reload, runner.status)
+        app = create_app(ha, runner.reload, runner.status, diagnostics=runner.diagnostics)
         web_runner = web.AppRunner(app)
         await web_runner.setup()
         await web.TCPSite(web_runner, "0.0.0.0", INGRESS_PORT).start()

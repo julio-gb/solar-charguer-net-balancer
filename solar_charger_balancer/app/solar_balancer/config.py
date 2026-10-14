@@ -43,6 +43,9 @@ class Config:
     end_of_hour_window_minutes: int = 10
     hour_close_delay_minutes: int = 10
     safety_margin_wh: int = 50
+    strategy: str = "acumulado"
+    surplus_factor: float = 0.5
+    home_includes_charger: bool = False
     min_on_minutes: int = 5
     min_off_minutes: int = 5
     disconnect_tolerance_seconds: int = 120
@@ -112,6 +115,9 @@ def parse_config(raw: dict) -> Config:
         if isinstance(items, str):
             items = items.split(",")
         values[key] = tuple(str(i).strip().lower() for i in items if str(i).strip())
+    if values.get("strategy", "acumulado") not in ("acumulado", "prevision"):
+        raise ConfigError("Estrategia no válida")
+    values["home_includes_charger"] = str(values.get("home_includes_charger", False)).lower() in ("true", "1", "si", "sí", "on")
     values["holidays"] = frozenset(date.fromisoformat(d) for d in raw.get("holidays") or [])
     values["tariff_periods"] = tuple(periods)
     return Config(**values)

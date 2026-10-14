@@ -18,7 +18,9 @@ from .storage import save_state
 from .tariff import Tariff
 
 _LOGGER = logging.getLogger(__name__)
+VERSION = "0.4.0"
 KEEP_DAYS = 400
+TRACE_LEN = 2500
 NOTIFICATION_ID = "solar_charger_balancer_offline"
 
 
@@ -31,6 +33,12 @@ def _stamp(state: dict | None) -> datetime | None:
         return datetime.fromisoformat(raw) if raw else None
     except ValueError:
         return None
+
+
+def _raw_stamp(state: dict | None) -> str | None:
+    if not state:
+        return None
+    return f"{state.get('state')}@{state.get('last_updated', '')[11:19]}"
 
 
 def hour_start(dt: datetime) -> datetime:
@@ -48,6 +56,7 @@ class Balancer:
             voltage=config.voltage, min_current=config.min_current, max_current=config.max_current,
             decision_interval_min=config.decision_interval_minutes, end_window_min=config.end_of_hour_window_minutes,
             margin_wh=config.safety_margin_wh, min_on_min=config.min_on_minutes, min_off_min=config.min_off_minutes,
+            strategy=config.strategy, surplus_factor=config.surplus_factor,
         )
         self.charger = Charger(ha, ChargerEntities(
             start=config.charger_start_entity, current=config.charger_current_entity,
@@ -75,8 +84,12 @@ class Balancer:
         self.decision = None
         self.mode = "Iniciando"
         self.events: deque[dict] = deque(maxlen=30)
+        # Traza de diagnóstico: una entrada por decisión u orden enviada (≈ 7 días).
+        self.trace: deque[dict] = deque(maxlen=TRACE_LEN)
+        self._stamps_raw: dict[str, str | None] = {}
         self.notified_offline = False
         self.offline_logged = False
+        self._decided = False
         self.wake = asyncio.Event()
 
     # ------------------------------------------------------------------ estado
@@ -89,6 +102,8 @@ class Balancer:
             self.forced_message = f"Programada: {self.forced.describe()}"
         self.soc.load(data.get("soc", {}))
         self.ev_total = data.get("ev_total", 0.0)
+        for item in data.get("trace", []):
+            self.trace.append(item)
         for event in data.get("events", []):
             self.events.append(event)
         if data.get("prev"):
@@ -118,6 +133,7 @@ class Balancer:
             "forced_inputs": self.forced_inputs,
             "soc": self.soc.to_dict(),
             "events": list(self.events),
+            "trace": list(self.trace),
         }
 
     # ------------------------------------------------------------------ utilidades
@@ -222,15 +238,20 @@ class Balancer:
          workday) = await asyncio.gather(*(self._read(i) for i in ids))
 
         self.powers = {"gen": to_float(p_gen), "home": to_float(p_home), "ev": to_float(p_ev)}
+        if c.home_includes_charger and self.powers["home"] is not None:
+            self.powers["home"] = max(0.0, self.powers["home"] - (self.powers["ev"] or 0.0))
         self.workday_override = (workday["state"] == "on") if is_available(workday) else None
+        deltas = {k: self.counters[k].update(to_float(st)) for k, st in (("gen", e_gen), ("home", e_home), ("ev", e_ev))}
+        if c.home_includes_charger:
+            deltas["home"] = max(0.0, deltas["home"] - deltas["ev"])
         for key, state in (("gen", e_gen), ("home", e_home), ("ev", e_ev)):
-            delta = self.counters[key].update(to_float(state))
             stamp = _stamp(state) or now
-            self._allocate(key, delta, self.stamps[key], stamp)
+            self._allocate(key, deltas[key], self.stamps[key], stamp)
             if is_available(state):
                 self.stamps[key] = stamp
-            if key == "ev":
-                self.ev_total += delta
+        self.ev_total += deltas["ev"]
+        self._stamps_raw = {"gen_kw": _raw_stamp(p_gen), "home_kw": _raw_stamp(p_home),
+                            "gen_kwh": _raw_stamp(e_gen), "home_kwh": _raw_stamp(e_home), "ev_kwh": _raw_stamp(e_ev)}
         if self.prev and now >= self.hour + timedelta(minutes=self.cfg.hour_close_delay_minutes):
             self._close_hour(self.prev["hour"], self.prev["acc"])
             self.prev = None
@@ -251,6 +272,9 @@ class Balancer:
         await self._control(now)
 
         sent = await self.charger.reconcile(now)
+        if sent or self._decided:
+            self._trace(now, sent)
+        self._decided = False
         if sent:
             if self.charger.start_blocked:
                 self.event("El coche no inicia la carga tras varios intentos (¿batería llena?); "
@@ -258,6 +282,33 @@ class Balancer:
             else:
                 _LOGGER.info("Orden enviada al cargador: %s", sent)
         self.publish(now)
+
+    def _trace(self, now: datetime, sent: str | None) -> None:
+        d, ch = self.decision, self.charger
+        r = lambda v, n=3: None if v is None else round(v, n)  # noqa: E731
+        self.trace.append({
+            "t": now.isoformat(timespec="seconds"), "modo": self.mode,
+            "hora_kwh": {k: r(v) for k, v in self.acc.items()},
+            "potencia_kw": {k: r(v) for k, v in self.powers.items()},
+            "decision": None if d is None else {
+                "cargar": d.charge, "A": d.current_a, "motivo": d.reason, "saldo_wh": round(d.balance_wh),
+                "disponible_wh": round(d.available_wh), "prevision_wh": round(d.forecast_wh),
+                "min_restantes": round(d.minutes_left, 1)},
+            "cargador": {"online": ch.online, "estado": ch.state_text, "cargando": ch.actual_on,
+                         "A_real": ch.actual_current, "deseado": ch.desired_on, "A_deseado": ch.desired_current},
+            "orden": sent, "lecturas": self._stamps_raw,
+        })
+
+    def diagnostics(self) -> dict:
+        now = self.now()
+        recent = [r.to_dict() for r in self.records if r.start >= now - timedelta(days=14)]
+        cfg = {k: (list(v) if isinstance(v, (tuple, frozenset)) else v)
+               for k, v in self.cfg.__dict__.items() if k != "tariff_periods"}
+        cfg["holidays"] = sorted(str(d) for d in self.cfg.holidays)
+        return {"generado": now.isoformat(timespec="seconds"), "version": VERSION, "configuracion": cfg,
+                "modo": self.mode, "hora_en_curso": {"inicio": self.hour.isoformat() if self.hour else None,
+                                                      **self.acc},
+                "horas_cerradas": recent, "eventos": list(self.events), "traza": list(self.trace)}
 
     def _allocate(self, key: str, delta: float, t0: datetime | None, t1: datetime) -> None:
         """Reparte un incremento entre la hora anterior (si sigue abierta) y la actual,
@@ -335,6 +386,7 @@ class Balancer:
                                  self.powers["gen"], self.powers["home"], charging, current, self.last_switch),
                    self.params)
         self.decision, self.last_decision_at = d, now
+        self._decided = True
         if d.charge != charging or self.charger.desired_on is None:
             self.last_switch = now
             self.event(("Arranque a %d A" % d.current_a if d.charge else "Pausa") + f" · {d.reason}")

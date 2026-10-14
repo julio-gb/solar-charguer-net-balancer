@@ -36,6 +36,7 @@ SECTIONS = [
         _entity("generation_energy_entity", "Energía generada acumulada", "Contador de energía de las placas.", ["sensor"], ENERGY_UNITS, ["energy"]),
         _entity("home_power_entity", "Potencia del hogar", "Consumo del hogar sin incluir el cargador.", ["sensor"], POWER_UNITS, ["power"]),
         _entity("home_energy_entity", "Energía del hogar acumulada", "Contador del hogar sin incluir el cargador.", ["sensor"], ENERGY_UNITS, ["energy"]),
+        {"key": "home_includes_charger", "label": "Los sensores del hogar incluyen el cargador", "help": "Actívalo si la potencia y la energía del hogar ya suman lo que consume el cargador; el addon lo restará.", "type": "bool"},
     ]},
     {"title": "Cargador", "fields": [
         _entity("charger_power_entity", "Potencia del cargador", "Potencia que consume el cargador.", ["sensor"], POWER_UNITS, ["power"]),
@@ -67,6 +68,8 @@ SECTIONS = [
         _num("coverage_target_percent", "Cobertura solar anual objetivo", "Energía solar autoconsumida ÷ consumo total (hogar + cargador).", "int", 1, 100, 1, "%"),
     ]},
     {"title": "Control", "fields": [
+        {"key": "strategy", "label": "Estrategia", "help": "«acumulado»: solo carga con energía ya vertida en la hora (recomendado). «prevision»: adelanta la carga contando con el sol que queda en la hora; puede importar si el sol baja.", "type": "select", "options": ["acumulado", "prevision"]},
+        _num("surplus_factor", "Factor de prudencia del excedente", "Parte del excedente actual que se da por segura (0 = ninguna, 1 = todo).", "float", 0, 1, 0.05, ""),
         _num("decision_interval_minutes", "Intervalo de decisión", "Cada cuánto se recalcula la carga.", "int", 1, 30, 1, "min"),
         _num("poll_interval_seconds", "Intervalo de lectura", "Cada cuánto se leen las entidades.", "int", 10, 300, 1, "s"),
         _num("end_of_hour_window_minutes", "Ventana final de la hora", "En estos minutos solo se arranca con el saldo ya acumulado.", "int", 0, 30, 1, "min"),
@@ -125,6 +128,11 @@ def _hhmm(value: str, allow_24: bool) -> int:
 
 def check(raw: dict) -> tuple[dict, dict[str, str]]:
     """Normaliza los tipos y valida rangos. Devuelve (valores limpios, errores por campo)."""
+    # Campos añadidos en versiones nuevas: si faltan, se usa su valor por defecto.
+    raw = dict(raw)
+    for name, f in Config.__dataclass_fields__.items():
+        if name not in raw and isinstance(f.default, (int, float, str, bool, tuple)):
+            raw[name] = list(f.default) if isinstance(f.default, tuple) else f.default
     clean, errors = dict(raw), {}
     for section in SECTIONS:
         for f in section["fields"]:
@@ -146,6 +154,8 @@ def check(raw: dict) -> tuple[dict, dict[str, str]]:
                     clean[key] = [str(i).strip().lower() for i in items if str(i).strip()]
                     if not clean[key]:
                         errors[key] = "Indica al menos un valor."
+                elif kind == "bool":
+                    clean[key] = value is True or str(value).lower() in ("true", "1", "on", "sí", "si")
                 elif kind == "select":
                     if value not in f["options"]:
                         errors[key] = "Valor no válido."

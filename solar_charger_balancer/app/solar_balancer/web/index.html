@@ -47,6 +47,7 @@ td{padding:4px}
 .bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:12px 16px}
 .bar .in{max-width:860px;margin:0 auto;display:flex;gap:12px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
 #msg{margin-right:auto;font-weight:600}
+.btnlink{color:var(--accent);font-weight:600;text-decoration:none;padding:8px 6px}
 </style>
 </head>
 <body>
@@ -58,7 +59,7 @@ td{padding:4px}
   <div id="status" class="banner" hidden></div>
   <div id="form"><p class="sub">Cargando…</p></div>
 </main>
-<div class="bar"><div class="in"><span id="msg" role="status"></span><button id="reload" type="button">Descartar cambios</button><button id="save" class="primary" type="button">Guardar</button></div></div>
+<div class="bar"><div class="in"><span id="msg" role="status"></span><a id="diag" href="api/diagnostics" download class="btnlink">Descargar diagnóstico</a><button id="reload" type="button">Descartar cambios</button><button id="save" class="primary" type="button">Guardar</button></div></div>
 
 <script>
 (() => {
@@ -152,13 +153,19 @@ td{padding:4px}
     return [h("div", { class: "tbl" }, h("table", {}, h("thead", {}, h("tr", {}, ["Día", "Inicio", "Fin", "Precio", ""].map(t => h("th", {}, t)))), body)), h("div", { class: "row" }, add, sort)];
   }
 
+  function boolField(f) {
+    const box = h("input", { type: "checkbox", id: f.key, checked: !!values[f.key], style: "width:auto" });
+    box.addEventListener("change", () => values[f.key] = box.checked);
+    return [box];
+  }
+
   function tagsField(f) {
     const input = h("input", { id: f.key, value: (values[f.key] || []).join(", "), placeholder: "charging" });
     input.addEventListener("input", () => values[f.key] = input.value);
     return [input];
   }
 
-  const builders = { entity: entityField, int: numberField, float: numberField, select: selectField, tags: tagsField, dates: datesField, tariffs: tariffsField };
+  const builders = { entity: entityField, int: numberField, float: numberField, select: selectField, bool: boolField, tags: tagsField, dates: datesField, tariffs: tariffsField };
 
   function render() {
     const form = $("#form");

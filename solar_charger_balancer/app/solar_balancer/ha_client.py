@@ -57,15 +57,18 @@ class HAClient:
 
     async def _request(self, method: str, path: str, **kwargs):
         try:
+            kwargs.setdefault("timeout", self._timeout)
             async with self._session.request(method, f"{self._base}{path}", headers=self._headers,
-                                             timeout=self._timeout, **kwargs) as resp:
+                                             **kwargs) as resp:
                 if resp.status == 404:
                     return None
                 if resp.status >= 400:
                     raise HAError(f"{method} {path}: HTTP {resp.status} {await resp.text()}")
                 return await resp.json(content_type=None)
-        except (aiohttp.ClientError, TimeoutError) as err:
-            raise HAError(f"{method} {path}: {err}") from err
+        except TimeoutError as err:
+            raise HAError(f"{method} {path}: sin respuesta (tiempo de espera agotado)") from err
+        except aiohttp.ClientError as err:
+            raise HAError(f"{method} {path}: {err or type(err).__name__}") from err
 
     async def get_config(self) -> dict:
         return await self._request("GET", "/config") or {}
@@ -79,7 +82,9 @@ class HAClient:
         return await self._request("GET", f"/states/{entity_id}")
 
     async def call_service(self, domain: str, service: str, data: dict) -> None:
-        await self._request("POST", f"/services/{domain}/{service}", json=data)
+        # Los cargadores con WiFi débil pueden tardar en confirmar la orden.
+        await self._request("POST", f"/services/{domain}/{service}", json=data,
+                            timeout=aiohttp.ClientTimeout(total=30))
 
     async def notify(self, title: str, message: str, notification_id: str) -> None:
         await self.call_service("persistent_notification", "create",

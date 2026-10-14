@@ -1,6 +1,7 @@
 """Página de configuración del addon, servida por Ingress (panel lateral de HA)."""
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 from typing import Awaitable, Callable
@@ -29,7 +30,8 @@ def _entity_summary(state: dict) -> dict:
 
 
 def create_app(ha: HAClient, on_saved: Callable[[], Awaitable[None] | None], status: Callable[[], dict],
-               allowed_ips: set[str] | None = None) -> web.Application:
+               allowed_ips: set[str] | None = None,
+               diagnostics: Callable[[], dict] | None = None) -> web.Application:
     allowed = allowed_ips if allowed_ips is not None else {INGRESS_IP}
 
     @web.middleware
@@ -76,10 +78,17 @@ def create_app(ha: HAClient, on_saved: Callable[[], Awaitable[None] | None], sta
         _LOGGER.info("Configuración guardada desde la página del addon")
         return web.json_response({"ok": True})
 
+    async def get_diagnostics(request):
+        data = diagnostics() if diagnostics else {}
+        name = f"solar-charger-diagnostico-{data.get('generado', '')[:16].replace(':', '')}.json"
+        return web.json_response(data, dumps=lambda o: json.dumps(o, ensure_ascii=False, indent=1, default=str),
+                                 headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
     app = web.Application(middlewares=[only_ingress])
     app.router.add_get("/", index)
     app.router.add_get("/api/schema", get_schema)
     app.router.add_get("/api/settings", get_settings)
     app.router.add_get("/api/entities", get_entities)
     app.router.add_post("/api/settings", post_settings)
+    app.router.add_get("/api/diagnostics", get_diagnostics)
     return app

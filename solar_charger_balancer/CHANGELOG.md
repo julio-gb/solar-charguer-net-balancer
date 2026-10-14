@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0
+- Nueva estrategia por defecto «acumulado»: solo carga con energía ya vertida en la hora,
+  sin contar con el sol que queda. Evita importar por la tarde, cuando baja la producción
+  o sube el consumo de la casa con datos de FusionSolar atrasados.
+- La estrategia anterior queda como «prevision», con un factor de prudencia configurable.
+- Opción «Los sensores del hogar incluyen el cargador»: el addon resta el consumo del cargador.
+- Traza de diagnóstico de cada decisión y botón «Descargar diagnóstico» en la página.
+- Más tiempo de espera (30 s) para las órdenes al cargador y mensajes de error más claros.
+
 ## 0.3.1
 - Corrige el error 401 al arrancar: el proceso no recibía el token del Supervisor.
 

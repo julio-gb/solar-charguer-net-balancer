@@ -1,5 +1,5 @@
 name: Solar Charger Balancer
-version: "0.3.1"
+version: "0.4.0"
 slug: solar_charger_balancer
 description: Carga el coche con los excedentes solares usando el balance neto horario.
 url: https://github.com/julio-gb/solar-charguer-net-balancer
@@ -42,6 +42,9 @@ options:
   end_of_hour_window_minutes: 10
   hour_close_delay_minutes: 10
   safety_margin_wh: 50
+  strategy: acumulado
+  surplus_factor: 0.5
+  home_includes_charger: false
   min_on_minutes: 5
   min_off_minutes: 5
   disconnect_tolerance_seconds: 120
@@ -87,6 +90,9 @@ schema:
   end_of_hour_window_minutes: int(0,30)
   hour_close_delay_minutes: int(0,30)
   safety_margin_wh: int(0,1000)
+  strategy: list(acumulado|prevision)
+  surplus_factor: float(0,1)
+  home_includes_charger: bool
   min_on_minutes: int(0,60)
   min_off_minutes: int(0,60)
   disconnect_tolerance_seconds: int(0,3600)

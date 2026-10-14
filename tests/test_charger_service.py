@@ -150,7 +150,7 @@ def make_balancer():
                     ("sensor.pv_energy", 1000.0, "kWh"), ("sensor.home_energy", 500.0, "kWh"),
                     ("sensor.ev_energy", 200.0, "kWh"), ("switch.ev_charger", "off", None), ("number.ev_current", 6, "A")]:
         ha.set(e, v, u)
-    b = Balancer(make_config(), ha, TZ)
+    b = Balancer(make_config(strategy="prevision", surplus_factor=1.0), ha, TZ)
     b.now = Clock(datetime(2026, 10, 10, 13, 0, 30, tzinfo=TZ))
     return b, ha
 
@@ -209,7 +209,8 @@ def test_balancer_with_beny_waits_for_car_then_charges():
         ha.set(e, v, u)
     cfg = make_config(charger_start_entity="button.b_start", charger_stop_entity="button.b_stop",
                       charger_current_entity="number.b_cur", charger_current_apply_entity="button.b_send",
-                      charger_current_readback_entity="sensor.b_cur", charger_state_entity="sensor.b_state")
+                      charger_current_readback_entity="sensor.b_cur", charger_state_entity="sensor.b_state",
+                      strategy="prevision", surplus_factor=1.0)
     b = Balancer(cfg, ha, TZ)
     b.now = Clock(datetime(2026, 10, 10, 13, 0, 30, tzinfo=TZ))
     run(b.poll())
@@ -220,3 +221,20 @@ def test_balancer_with_beny_waits_for_car_then_charges():
     assert b.mode == "Solar · cargando"
     assert ("button", "press", "button.b_start") in ha.calls
     assert b.events[0]["text"].startswith("Arranque") and b.events[1]["text"] == "Coche conectado"
+
+
+def test_home_sensor_including_charger_is_corrected_and_traced():
+    b, ha = make_balancer()
+    b.cfg = make_config(home_includes_charger=True)
+    ha.set("sensor.home_power", 1700, "W")
+    ha.set("sensor.ev_power", 1.4, "kW")
+    run(b.poll())
+    assert round(b.powers["home"], 2) == 0.3
+    ha.set("sensor.home_energy", 501.0, "kWh")      # +1,0 kWh, de ellos 0,7 del cargador
+    ha.set("sensor.ev_energy", 200.7, "kWh")
+    b.now.t += timedelta(minutes=5)
+    run(b.poll())
+    assert round(b.acc["home"], 2) == 0.3 and round(b.acc["ev"], 2) == 0.7
+    diag = b.diagnostics()
+    assert diag["traza"] and diag["traza"][0]["decision"] is not None
+    assert diag["configuracion"]["home_includes_charger"] is True
