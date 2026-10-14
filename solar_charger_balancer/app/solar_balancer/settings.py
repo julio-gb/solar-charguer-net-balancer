@@ -41,6 +41,7 @@ SECTIONS = [
     {"title": "Cargador", "fields": [
         _entity("charger_power_entity", "Potencia del cargador", "Potencia que consume el cargador.", ["sensor"], POWER_UNITS, ["power"]),
         _entity("charger_energy_entity", "Energía del cargador acumulada", "Contador de energía del cargador.", ["sensor"], ENERGY_UNITS, ["energy"]),
+        {"key": "charger_energy_source", "label": "Cálculo de la energía del cargador", "help": "«potencia»: se integra la potencia del cargador en cada lectura (más preciso si el contador avanza a saltos de 0,1 kWh). «contador»: se usa el contador de energía.", "type": "select", "options": ["potencia", "contador"]},
         _entity("charger_start_entity", "Iniciar carga", "Botón de iniciar carga, o un interruptor que inicia y detiene.", ["button", "switch", "input_boolean"]),
         _entity("charger_stop_entity", "Parar carga", "Botón de parar carga. No hace falta si usas un interruptor.", ["button"], required=False),
         _entity("charger_state_entity", "Estado del cargador", "Sensor de texto con el estado (cargando, desconectado…).", ["sensor"], required=False, no_unit=True),

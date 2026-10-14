@@ -225,7 +225,7 @@ def test_balancer_with_beny_waits_for_car_then_charges():
 
 def test_home_sensor_including_charger_is_corrected_and_traced():
     b, ha = make_balancer()
-    b.cfg = make_config(home_includes_charger=True)
+    b.cfg = make_config(home_includes_charger=True, charger_energy_source="contador")
     ha.set("sensor.home_power", 1700, "W")
     ha.set("sensor.ev_power", 1.4, "kW")
     run(b.poll())
@@ -238,3 +238,27 @@ def test_home_sensor_including_charger_is_corrected_and_traced():
     diag = b.diagnostics()
     assert diag["traza"] and diag["traza"][0]["decision"] is not None
     assert diag["configuracion"]["home_includes_charger"] is True
+
+
+
+def test_charger_energy_from_power_integration_splits_hours():
+    b, ha = make_balancer()
+    ha.set("sensor.ev_power", 1.38, "kW")
+    b.now.t = datetime(2026, 10, 10, 13, 55, 0, tzinfo=TZ)
+    b.hour = datetime(2026, 10, 10, 13, 0, tzinfo=TZ)
+    for _ in range(20):                       # 10 min con lecturas cada 30 s (13:55 → 14:05)
+        run(b.poll())
+        b.now.t += timedelta(seconds=30)
+    run(b.poll())
+    total = b.prev["acc"]["ev"] + b.acc["ev"]
+    assert round(total, 3) == round(1.38 * 10 / 60, 3)
+    assert round(b.prev["acc"]["ev"], 3) == round(1.38 * 5 / 60, 3)   # 13:55–14:00 a la hora 13
+
+
+def test_power_integration_ignores_long_gaps():
+    b, ha = make_balancer()
+    ha.set("sensor.ev_power", 1.38, "kW")
+    run(b.poll())
+    b.now.t += timedelta(minutes=20)
+    run(b.poll())
+    assert b.acc["ev"] == 0.0

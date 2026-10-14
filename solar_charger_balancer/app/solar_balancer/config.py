@@ -46,6 +46,7 @@ class Config:
     strategy: str = "acumulado"
     surplus_factor: float = 0.5
     home_includes_charger: bool = False
+    charger_energy_source: str = "potencia"
     min_on_minutes: int = 5
     min_off_minutes: int = 5
     disconnect_tolerance_seconds: int = 120
@@ -115,6 +116,8 @@ def parse_config(raw: dict) -> Config:
         if isinstance(items, str):
             items = items.split(",")
         values[key] = tuple(str(i).strip().lower() for i in items if str(i).strip())
+    if values.get("charger_energy_source", "potencia") not in ("potencia", "contador"):
+        raise ConfigError("Fuente de energía del cargador no válida")
     if values.get("strategy", "acumulado") not in ("acumulado", "prevision"):
         raise ConfigError("Estrategia no válida")
     values["home_includes_charger"] = str(values.get("home_includes_charger", False)).lower() in ("true", "1", "si", "sí", "on")

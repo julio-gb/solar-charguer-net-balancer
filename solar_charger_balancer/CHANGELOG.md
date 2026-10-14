@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.1
+- La energía del cargador se calcula integrando su potencia en cada lectura (opción
+  «Cálculo de la energía del cargador»: potencia / contador). Evita el error de los
+  contadores que avanzan a saltos de 0,1 kWh.
+
 ## 0.4.0
 - Nueva estrategia por defecto «acumulado»: solo carga con energía ya vertida en la hora,
   sin contar con el sol que queda. Evita importar por la tarde, cuando baja la producción

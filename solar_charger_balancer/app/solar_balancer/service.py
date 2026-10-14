@@ -18,7 +18,7 @@ from .storage import save_state
 from .tariff import Tariff
 
 _LOGGER = logging.getLogger(__name__)
-VERSION = "0.4.0"
+VERSION = "0.4.1"
 KEEP_DAYS = 400
 TRACE_LEN = 2500
 NOTIFICATION_ID = "solar_charger_balancer_offline"
@@ -90,6 +90,7 @@ class Balancer:
         self.notified_offline = False
         self.offline_logged = False
         self._decided = False
+        self._ev_power_prev: tuple[datetime, float] | None = None  # (momento, kW) de la lectura anterior
         self.wake = asyncio.Event()
 
     # ------------------------------------------------------------------ estado
@@ -242,9 +243,15 @@ class Balancer:
             self.powers["home"] = max(0.0, self.powers["home"] - (self.powers["ev"] or 0.0))
         self.workday_override = (workday["state"] == "on") if is_available(workday) else None
         deltas = {k: self.counters[k].update(to_float(st)) for k, st in (("gen", e_gen), ("home", e_home), ("ev", e_ev))}
+        ev_window = None
+        if c.charger_energy_source == "potencia":
+            deltas["ev"], ev_window = self._integrate_ev_power(now)
         if c.home_includes_charger:
             deltas["home"] = max(0.0, deltas["home"] - deltas["ev"])
         for key, state in (("gen", e_gen), ("home", e_home), ("ev", e_ev)):
+            if key == "ev" and ev_window:
+                self._allocate(key, deltas[key], *ev_window)
+                continue
             stamp = _stamp(state) or now
             self._allocate(key, deltas[key], self.stamps[key], stamp)
             if is_available(state):
@@ -282,6 +289,19 @@ class Balancer:
             else:
                 _LOGGER.info("Orden enviada al cargador: %s", sent)
         self.publish(now)
+
+    def _integrate_ev_power(self, now: datetime) -> tuple[float, tuple[datetime, datetime] | None]:
+        """Energía del cargador desde la lectura anterior, por el método del trapecio sobre su potencia."""
+        kw = self.powers["ev"]
+        prev, self._ev_power_prev = self._ev_power_prev, ((now, kw) if kw is not None else None)
+        if prev is None or kw is None:
+            return 0.0, None
+        t0, kw0 = prev
+        hours = (now - t0).total_seconds() / 3600
+        # Un hueco largo (addon parado o sensor sin datos) no se rellena con una suposición.
+        if hours <= 0 or hours > 3 * self.cfg.poll_interval_seconds / 3600 + 1 / 60:
+            return 0.0, None
+        return max(0.0, (kw0 + kw) / 2 * hours), (t0, now)
 
     def _trace(self, now: datetime, sent: str | None) -> None:
         d, ch = self.decision, self.charger
