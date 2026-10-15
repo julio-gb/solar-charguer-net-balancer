@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.2
+- Una carga iniciada en los últimos minutos de la hora se detiene al empezar la siguiente
+  aunque no haya pasado el tiempo mínimo encendido, si el nuevo saldo no la cubre.
+
 ## 0.4.1
 - La energía del cargador se calcula integrando su potencia en cada lectura (opción
   «Cálculo de la energía del cargador»: potencia / contador). Evita el error de los

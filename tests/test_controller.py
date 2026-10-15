@@ -38,10 +38,17 @@ def test_end_window_only_starts_with_accumulated_balance():
     assert d.charge and d.current_a >= 6
 
 
-def test_min_on_time_holds_state():
-    d = decide(inp(minute=20, gen=0.0, home=0.5, gen_kw=0.0, home_kw=0.5, charging=True,
+def test_min_on_time_holds_state_when_balance_covers_it():
+    d = decide(inp(minute=20, gen=0.6, home=0.1, gen_kw=0.0, home_kw=0.5, charging=True,
                    last=T0 + timedelta(minutes=18)), P)
     assert d.charge
+
+
+def test_end_of_hour_charge_stops_at_new_hour_despite_min_on():
+    """Caso real 15/10: arranque a las 15:55 que seguía cargando a las 16:00 con saldo 0."""
+    d = decide(inp(minute=0, gen_kw=0.85, home_kw=0.11, charging=True, amps=11,
+                   last=T0 - timedelta(minutes=5)), A)
+    assert not d.charge
 
 
 def test_simulated_hour_closes_without_import():

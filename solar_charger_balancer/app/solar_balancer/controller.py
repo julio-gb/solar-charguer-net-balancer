@@ -127,7 +127,11 @@ def decide(inp: ControlInputs, p: ControlParams) -> Decision:
     if inp.last_switch is not None and charge != inp.charging:
         elapsed = (inp.now - inp.last_switch).total_seconds() / 60.0
         limit = p.min_on_min if inp.charging else p.min_off_min
-        if elapsed < limit:
+        # Mantener la carga solo si el saldo cubre lo que queda del tiempo mínimo; si no (p. ej. una
+        # carga de los últimos minutos que cruza al empezar la hora siguiente), se para ya.
+        hold_hours = max(0.0, limit - elapsed) / 60.0
+        affordable = not inp.charging or available >= kw_for(inp.current_a, p.voltage) * hold_hours
+        if elapsed < limit and affordable:
             keep_amps = inp.current_a if inp.charging else amps
             return result(inp.charging, keep_amps, f"Se mantiene el estado (tiempo mínimo {limit:g} min)",
                           h_cycle if inp.charging else 0.0)

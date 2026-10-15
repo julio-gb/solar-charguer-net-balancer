@@ -18,7 +18,7 @@ from .storage import save_state
 from .tariff import Tariff
 
 _LOGGER = logging.getLogger(__name__)
-VERSION = "0.4.1"
+VERSION = "0.4.2"
 KEEP_DAYS = 400
 TRACE_LEN = 2500
 NOTIFICATION_ID = "solar_charger_balancer_offline"
