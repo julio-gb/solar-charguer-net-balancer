@@ -150,3 +150,22 @@ def compute_stats(records: list[HourRecord], current: HourRecord, now: datetime,
         savings_month=_sum(month_recs, "savings"),
         savings_year=_sum(year_recs, "savings"),
     )
+
+
+def daily_history(records: list[HourRecord], now: datetime, days: int) -> list[dict]:
+    """Resumen por día de los últimos `days` días (incluido hoy, en curso) para las gráficas."""
+    first = (now - timedelta(days=days - 1)).date()
+    by_day: dict = {}
+    for r in records:
+        day = r.start.date()
+        if first <= day <= now.date():
+            by_day.setdefault(day, []).append(r)
+    out = []
+    for day in sorted(by_day):
+        recs = by_day[day]
+        ev = _sum(recs, "ev")
+        ev_solar = _sum(recs, "ev_solar")
+        cov = coverage(recs)
+        out.append({"d": day.isoformat(), "solar": round(ev_solar, 2), "red": round(ev - ev_solar, 2),
+                    "cob": None if cov is None else round(cov, 1)})
+    return out

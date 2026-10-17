@@ -31,3 +31,12 @@ def test_coverage_stats():
     assert round(stats.coverage_today) == 50          # 1,0 solar / 2,0 consumo
     assert round(stats.ev_solar_share_today) == 58    # 0,7 / 1,2
     assert round(stats.kwh_to_target, 2) == 0.2       # 60 % de 2,0 − 1,0
+
+
+def test_daily_history():
+    from solar_balancer.energy import daily_history
+    recs = [HourRecord("2026-10-16T12:00:00+02:00", 1.0, 0.2, 0.6, 0.119, 0.02),
+            HourRecord("2026-10-16T22:00:00+02:00", 0.0, 0.2, 1.0, 0.119, 0.02),
+            HourRecord("2026-09-01T12:00:00+02:00", 1.0, 0.2, 0.0, 0.119, 0.02)]   # fuera de los 30 días
+    days = daily_history(recs, datetime.fromisoformat("2026-10-17T10:00:00+02:00"), 30)
+    assert days == [{"d": "2026-10-16", "solar": 0.6, "red": 1.0, "cob": 40.0}]   # 0,8 solar / 2,0 consumo

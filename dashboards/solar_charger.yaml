@@ -314,22 +314,22 @@ views:
               - min: 0
                 decimals: 0
             series:
-              # Sensores «… ayer»: el valor de cada día se publica al día siguiente (time_delta lo recoloca).
-              - entity: sensor.solar_charger_coche_solar_ayer
+              # Datos del sensor «Histórico diario» del addon (últimos 30 días, hoy incluido).
+              - entity: sensor.solar_charger_historico_diario
                 name: Con sol
                 type: column
                 color: "#F2A93B"
                 float_precision: 1
-                time_delta: "-1d"
-                statistics: { type: mean, period: day, align: start }
+                data_generator: |
+                  return (entity.attributes.dias || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.solar]);
                 show: { legend_value: false }
-              - entity: sensor.solar_charger_coche_red_ayer
+              - entity: sensor.solar_charger_historico_diario
                 name: De la red
                 type: column
                 color: "#8A94A6"
                 float_precision: 1
-                time_delta: "-1d"
-                statistics: { type: mean, period: day, align: start }
+                data_generator: |
+                  return (entity.attributes.dias || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.red]);
                 show: { legend_value: false }
           - type: custom:apexcharts-card
             section_mode: true
@@ -354,14 +354,14 @@ views:
                 max: 100
                 decimals: 0
             series:
-              - entity: sensor.solar_charger_cobertura_solar_ayer
+              - entity: sensor.solar_charger_historico_diario
                 name: Cobertura solar
                 type: area
                 color: "#2FB5A0"
                 stroke_width: 2
                 float_precision: 0
-                time_delta: "-1d"
-                statistics: { type: mean, period: day, align: start }
+                data_generator: |
+                  return (entity.attributes.dias || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.cob]);
                 show: { legend_value: false }
 
       # ================================================================== VENTANAS EMERGENTES

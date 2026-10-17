@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 from .charger import Charger, ChargerEntities, ChargerReadings
 from .config import Config
 from .controller import ControlInputs, ControlParams, decide, minutes_left_in_hour
-from .energy import CounterTracker, HourRecord, compute_stats, coverage
+from .energy import CounterTracker, HourRecord, compute_stats, coverage, daily_history
 from .forced import ForcedCharge, ScheduleError, parse_start
 from .ha_client import HAClient, HAError, is_available, to_float
 from .soc import SocEstimator
@@ -18,7 +18,7 @@ from .storage import save_state
 from .tariff import Tariff
 
 _LOGGER = logging.getLogger(__name__)
-VERSION = "0.5.0"
+VERSION = "0.5.1"
 KEEP_DAYS = 400
 TRACE_LEN = 2500
 NOTIFICATION_ID = "solar_charger_balancer_offline"
@@ -463,6 +463,8 @@ class Balancer:
             p("coverage_yesterday", r1(coverage(yesterday)))
             p("ev_solar_yesterday", round(ev_solar, 2))
             p("ev_grid_yesterday", round(sum(r.ev for r in yesterday) - ev_solar, 2))
+        days = daily_history(closed + [current], now, 30)
+        p("daily_history", len(days), {"dias": days})
         p("savings_today", round(stats.savings_today, 2))
         p("savings_month", round(stats.savings_month, 2))
         p("savings_year", round(stats.savings_year, 2))

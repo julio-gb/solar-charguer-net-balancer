@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.1
+- Nuevo sensor «Histórico diario» con los últimos 30 días (carga solar/red del coche y
+  cobertura) en un atributo: las gráficas de 30 días se ven al momento, sin esperar a
+  las estadísticas a largo plazo de HA.
+
 ## 0.5.0
 - Dashboard rediseñado: menos tarjetas, sin datos repetidos y gráficas más altas
   (energía por hora apilada, saldo de cada hora en kWh y vista de 30 días).

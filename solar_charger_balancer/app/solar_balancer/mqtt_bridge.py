@@ -95,6 +95,7 @@ ENTITIES: list[Entity] = [
     _sensor("ev_month", "Coche cargado mes", "kWh", "energy", "total_increasing", precision=1),
     _sensor("ev_solar_share_month", "Coche solar mes", "%", None, "measurement", "mdi:car-electric", 0),
     # Resumen del día anterior (constante durante el día): base de las gráficas de 30 días.
+    _sensor("daily_history", "Histórico diario", "días", None, None, "mdi:calendar-month", 0, attrs=True),
     _sensor("coverage_yesterday", "Cobertura solar ayer", "%", None, "measurement", "mdi:solar-power", 1),
     _sensor("ev_solar_yesterday", "Coche solar ayer", "kWh", None, "measurement", "mdi:solar-power-variant", 2),
     _sensor("ev_grid_yesterday", "Coche red ayer", "kWh", None, "measurement", "mdi:transmission-tower", 2),
@@ -147,7 +148,7 @@ class MqttBridge:
 
     def _device(self) -> dict:
         return {"identifiers": [PREFIX], "name": DEVICE_NAME, "manufacturer": "Solar Charger Net Balancer",
-                "model": "Addon Home Assistant", "sw_version": "0.5.0"}
+                "model": "Addon Home Assistant", "sw_version": "0.5.1"}
 
     def _discovery(self, entity: Entity) -> dict:
         payload: dict[str, Any] = {
