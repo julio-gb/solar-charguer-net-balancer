@@ -255,10 +255,18 @@ def test_charger_energy_from_power_integration_splits_hours():
     assert round(b.prev["acc"]["ev"], 3) == round(1.38 * 5 / 60, 3)   # 13:55–14:00 a la hora 13
 
 
-def test_power_integration_ignores_long_gaps():
+def test_power_gap_falls_back_to_energy_counter():
     b, ha = make_balancer()
     ha.set("sensor.ev_power", 1.38, "kW")
     run(b.poll())
-    b.now.t += timedelta(minutes=20)
+    ha.set("sensor.ev_power", "unavailable")             # corte: sin potencia
+    ha.set("sensor.ev_energy", 200.1, "kWh")
+    b.now.t += timedelta(minutes=3)
     run(b.poll())
-    assert b.acc["ev"] == 0.0
+    assert round(b.acc["ev"], 3) == 0.1                   # se usa el contador para el hueco
+    ha.set("sensor.ev_power", 1.38, "kW")
+    b.now.t += timedelta(seconds=30)
+    run(b.poll())
+    b.now.t += timedelta(seconds=30)
+    run(b.poll())
+    assert abs(b.acc["ev"] - (0.1 + 1.38 * 30 / 3600)) < 1e-6

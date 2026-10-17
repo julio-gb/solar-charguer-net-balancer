@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.3
+- Si la potencia del cargador deja de leerse (microcorte, reinicio), la energía de ese
+  tramo se toma del contador para no infravalorar lo cargado.
+
 ## 0.4.2
 - Una carga iniciada en los últimos minutos de la hora se detiene al empezar la siguiente
   aunque no haya pasado el tiempo mínimo encendido, si el nuevo saldo no la cubre.

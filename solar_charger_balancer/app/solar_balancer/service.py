@@ -18,7 +18,7 @@ from .storage import save_state
 from .tariff import Tariff
 
 _LOGGER = logging.getLogger(__name__)
-VERSION = "0.4.2"
+VERSION = "0.4.3"
 KEEP_DAYS = 400
 TRACE_LEN = 2500
 NOTIFICATION_ID = "solar_charger_balancer_offline"
@@ -245,7 +245,10 @@ class Balancer:
         deltas = {k: self.counters[k].update(to_float(st)) for k, st in (("gen", e_gen), ("home", e_home), ("ev", e_ev))}
         ev_window = None
         if c.charger_energy_source == "potencia":
-            deltas["ev"], ev_window = self._integrate_ev_power(now)
+            integrated, ev_window = self._integrate_ev_power(now)
+            if ev_window is not None:
+                deltas["ev"] = integrated
+            # Si falta la potencia (corte o reinicio), ese tramo se cubre con el contador de energía.
         if c.home_includes_charger:
             deltas["home"] = max(0.0, deltas["home"] - deltas["ev"])
         for key, state in (("gen", e_gen), ("home", e_home), ("ev", e_ev)):
