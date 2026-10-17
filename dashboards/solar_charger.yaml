@@ -1,6 +1,6 @@
-# Dashboard «Carga solar» del addon Solar Charger Balancer (v0.6).
+# Dashboard «Carga solar» del addon Solar Charger Balancer (v0.7).
 # Tarjetas de HACS que usa: Mushroom, ApexCharts Card, mini-graph-card,
-# Multiple Entity Row, auto-entities y Bubble Card (ventanas emergentes).
+# Multiple Entity Row, auto-entities, Bubble Card (ventanas emergentes) y Energy Custom Graph Card.
 # Uso: abrir el panel → ✏️ → ⋮ → Editor de configuración en bruto → pegar todo → Guardar.
 title: Carga solar
 views:
@@ -122,95 +122,82 @@ views:
                 color: "#2FB5A0"
             grid_options: { columns: full }
 
-      # ================================================================== HOY
+      # ================================================================== POR DÍA (con paginador)
+      # El selector de fechas cambia el día de la gráfica «Neto por hora» (timespan: energy).
       - type: grid
         column_span: 2
         cards:
           - type: heading
-            heading: Hoy
+            heading: Por día
             icon: mdi:chart-bar
-          - type: custom:apexcharts-card
-            section_mode: true
-            grid_options: { columns: full, rows: 6 }
-            graph_span: 24h
-            span: { start: day }
-            stacked: true
+          - type: energy-date-selection
+            grid_options: { columns: full }
+          - type: custom:energy-custom-graph-card
+            title: Neto por hora
+            grid_options: { columns: full }
+            timespan:
+              mode: energy
+            aggregation:
+              compute_current_hour: true
+              fallback: hour
             header:
-              show: true
-              title: Energía por hora (kWh)
-            apex_config:
-              plotOptions: { bar: { columnWidth: "90%", borderRadius: 2 } }
-              legend: { show: true, position: top }
-              dataLabels: { enabled: false }
-              xaxis: { labels: { format: "HH" } }
-              tooltip: { x: { format: "HH:00" } }
-            yaxis:
-              - min: 0
-                decimals: 1
+              chip:
+                metric:
+                  source: series
+                  series_id: neto
+                  reducer: last
+                label: Neto de la hora
+                unit: kWh
             series:
-              - entity: sensor.solar_charger_generacion_hora
-                name: Placas
-                type: column
-                color: "#F2A93B"
-                stack_group: placas
-                float_precision: 2
-                group_by: { func: max, duration: 1h }
-                show: { legend_value: false }
-              - entity: sensor.solar_charger_consumo_hogar_hora
+              - statistic_id: sensor.pasillo_principal_energia_shelly_principal_acumulados
+                id: hogar
                 name: Hogar
-                type: column
-                color: "#5B8BD0"
-                stack_group: consumo
-                float_precision: 2
-                group_by: { func: max, duration: 1h }
-                show: { legend_value: false }
-              - entity: sensor.solar_charger_consumo_cargador_hora
+                chart_type: bar
+                stat_type: change
+                stack: Net
+                color: --energy-grid-consumption-color
+              - statistic_id: sensor.beny_charger_220300221_cargador_energia_acumulado
+                id: coche
                 name: Coche
-                type: column
-                color: "#2FB5A0"
-                stack_group: consumo
-                float_precision: 2
-                group_by: { func: max, duration: 1h }
-                show: { legend_value: false }
-          - type: custom:apexcharts-card
-            section_mode: true
-            grid_options: { columns: full, rows: 5 }
-            graph_span: 24h
-            span: { start: day }
-            stacked: true
-            header:
-              show: true
-              title: Saldo de cada hora (kWh)
-            apex_config:
-              plotOptions: { bar: { columnWidth: "90%", borderRadius: 2 } }
-              legend: { show: true, position: top }
-              dataLabels: { enabled: false }
-              xaxis: { labels: { format: "HH" } }
-              tooltip: { x: { format: "HH:00" } }
-            yaxis:
-              - decimals: 1
-            series:
-              # El sensor se publica al cerrar cada hora; time_delta lo coloca en la hora a la que pertenece.
-              - entity: sensor.solar_charger_saldo_ultima_hora
-                name: Sin coste de red
-                type: column
-                color: "#4CAF6A"
-                unit: kWh
-                float_precision: 2
-                transform: "return Number(x) >= 0 ? Number(x) / 1000 : null;"
-                time_delta: "-1h"
-                group_by: { func: last, duration: 1h, fill: "null" }
-                show: { legend_value: false }
-              - entity: sensor.solar_charger_saldo_ultima_hora
-                name: Con compra de red
-                type: column
-                color: "#E0645C"
-                unit: kWh
-                float_precision: 2
-                transform: "return Number(x) < 0 ? Number(x) / 1000 : null;"
-                time_delta: "-1h"
-                group_by: { func: last, duration: 1h, fill: "null" }
-                show: { legend_value: false }
+                chart_type: bar
+                stat_type: change
+                stack: Net
+                color: --energy-battery-in-color
+              - id: solar
+                name: Solar
+                chart_type: bar
+                source: calculation
+                calculation:
+                  terms:
+                    - operation: subtract
+                      statistic_id: sensor.fv_mi_parte_energia_hoy
+                      stat_type: change
+                stack: Net
+              # Neto de cada hora = hogar + coche − solar. Por encima de 0 se compra a la red;
+              # por debajo, se vierte. Línea continua y sin relleno para que se lea el valor exacto.
+              - id: neto
+                name: Neto (+ compra / − vierte)
+                chart_type: line
+                source: calculation
+                calculation:
+                  terms:
+                    - operation: add
+                      statistic_id: sensor.pasillo_principal_energia_shelly_principal_acumulados
+                      stat_type: change
+                    - operation: add
+                      statistic_id: sensor.beny_charger_220300221_cargador_energia_acumulado
+                      stat_type: change
+                    - operation: subtract
+                      statistic_id: sensor.fv_mi_parte_energia_hoy
+                      stat_type: change
+                stack: Net
+                fill: false
+                line_style: solid
+                line_width: 3
+                line_opacity: 1
+                color: --error-color
+                show_in_legend: true
+                show_in_tooltip: true
 
       # ================================================================== OBJETIVO Y AHORRO
       - type: grid
