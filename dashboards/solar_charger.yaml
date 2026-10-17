@@ -1,8 +1,7 @@
-# Dashboard de seguimiento del addon Solar Charger Balancer.
+# Dashboard «Carga solar» del addon Solar Charger Balancer (v0.5).
 # Requiere (HACS): Mushroom y ApexCharts Card.
-# Uso: Ajustes → Paneles → Añadir panel → "Nuevo panel desde cero" → ⋮ → Editar panel
-#      → ⋮ → Editor de configuración en bruto → pegar este contenido.
-title: Solar Charger
+# Uso: Ajustes → Paneles → abrir el panel → ✏️ → ⋮ → Editor de configuración en bruto → pegar.
+title: Carga solar
 views:
   - title: Carga solar
     path: carga-solar
@@ -10,260 +9,336 @@ views:
     type: sections
     max_columns: 3
     sections:
-      # ---------------------------------------------------------------- Estado
+      # ------------------------------------------------------------------ AHORA
       - type: grid
         cards:
           - type: heading
-            heading: Estado
+            heading: Ahora
+            heading_style: title
             icon: mdi:solar-power-variant
-          - type: custom:mushroom-chips-card
-            chips:
-              - type: entity
-                entity: sensor.solar_charger_modo
-                icon_color: teal
-              - type: entity
-                entity: sensor.solar_charger_intensidad_objetivo
-                icon: mdi:current-ac
+            badges:
               - type: entity
                 entity: binary_sensor.solar_charger_cargador_en_linea
-                content_info: name
+                show_state: true
+                color: green
               - type: entity
                 entity: sensor.solar_charger_precio_actual
-                icon_color: amber
+                show_state: true
           - type: custom:mushroom-template-card
-            primary: Placas
-            secondary: "{{ states('sensor.solar_charger_potencia_placas') }} kW"
+            entity: sensor.solar_charger_modo
+            primary: "{{ states('sensor.solar_charger_modo') }}"
+            secondary: "{{ state_attr('sensor.solar_charger_modo', 'motivo') or 'Sin decisión todavía' }}"
+            multiline_secondary: true
+            icon: >-
+              {% set m = states('sensor.solar_charger_modo') %}
+              {{ 'mdi:ev-station' if 'cargando' in m or 'forzada' in m else
+                 'mdi:car-off' if 'desconectado' in m else 'mdi:pause-circle' }}
+            icon_color: >-
+              {% set m = states('sensor.solar_charger_modo') %}
+              {{ 'green' if 'cargando' in m else 'orange' if 'forzada' in m else 'grey' }}
+            tap_action: { action: more-info }
+          - type: custom:mushroom-template-card
+            entity: sensor.solar_charger_potencia_placas
+            primary: "{{ states('sensor.solar_charger_potencia_placas') | float(0) | round(2) }} kW"
+            secondary: Placas
             icon: mdi:solar-panel
             icon_color: amber
-            entity: sensor.solar_charger_potencia_placas
             layout: vertical
-            grid_options: { columns: 6 }
+            grid_options: { columns: 3 }
           - type: custom:mushroom-template-card
-            primary: Hogar
-            secondary: "{{ states('sensor.solar_charger_potencia_hogar') }} kW"
+            entity: sensor.solar_charger_potencia_hogar
+            primary: "{{ states('sensor.solar_charger_potencia_hogar') | float(0) | round(2) }} kW"
+            secondary: Hogar
             icon: mdi:home-lightning-bolt
             icon_color: blue
-            entity: sensor.solar_charger_potencia_hogar
             layout: vertical
-            grid_options: { columns: 6 }
+            grid_options: { columns: 3 }
           - type: custom:mushroom-template-card
-            primary: Cargador
-            secondary: "{{ states('sensor.solar_charger_potencia_cargador') }} kW"
-            icon: mdi:ev-station
-            icon_color: teal
             entity: sensor.solar_charger_potencia_cargador
+            primary: "{{ states('sensor.solar_charger_potencia_cargador') | float(0) | round(2) }} kW"
+            secondary: "Coche · {{ states('sensor.solar_charger_intensidad_objetivo') | int(0) }} A"
+            icon: mdi:car-electric
+            icon_color: teal
             layout: vertical
-            grid_options: { columns: 6 }
+            grid_options: { columns: 3 }
           - type: custom:mushroom-template-card
-            primary: Red
-            secondary: >-
+            entity: sensor.solar_charger_potencia_red
+            primary: >-
               {% set g = states('sensor.solar_charger_potencia_red') | float(0) %}
-              {{ '%+.2f' | format(g) }} kW · {{ 'importando' if g > 0 else 'vertiendo' }}
+              {{ (g | abs) | round(2) }} kW
+            secondary: >-
+              {{ 'Importando' if states('sensor.solar_charger_potencia_red') | float(0) > 0.02 else 'Vertiendo' }}
             icon: mdi:transmission-tower
             icon_color: >-
-              {{ 'red' if states('sensor.solar_charger_potencia_red') | float(0) > 0 else 'green' }}
-            entity: sensor.solar_charger_potencia_red
+              {{ 'red' if states('sensor.solar_charger_potencia_red') | float(0) > 0.02 else 'green' }}
             layout: vertical
-            grid_options: { columns: 6 }
+            grid_options: { columns: 3 }
           - type: custom:mushroom-template-card
+            entity: sensor.solar_charger_balance_hora
             primary: >-
-              Balance hora: {{ '%+d' | format(states('sensor.solar_charger_balance_hora') | int(0)) }} Wh
+              Hora en curso: {{ '%+d' | format(states('sensor.solar_charger_balance_hora') | int(0)) }} Wh
             secondary: >-
-              Previsión al cierre {{ states('sensor.solar_charger_prevision_cierre_hora') }} Wh ·
-              quedan {{ states('sensor.solar_charger_minutos_restantes_hora') }} min
-            multiline_secondary: true
+              Quedan {{ states('sensor.solar_charger_minutos_restantes_hora') }} min ·
+              debe cerrar ≥ 0 para no pagar red
             icon: mdi:scale-balance
             icon_color: >-
               {{ 'green' if states('sensor.solar_charger_balance_hora') | int(0) >= 0 else 'red' }}
-            entity: sensor.solar_charger_balance_hora
-          - type: markdown
-            content: >-
-              **Decisión:** {{ state_attr('sensor.solar_charger_modo', 'motivo') or '—' }}
 
-      # ---------------------------------------------------------------- Cobertura
-      - type: grid
-        cards:
-          - type: heading
-            heading: Cobertura solar (objetivo 60 %)
-            icon: mdi:solar-power
-          - type: gauge
-            entity: sensor.solar_charger_cobertura_solar_hoy
-            name: Hoy
-            min: 0
-            max: 100
-            needle: true
-            severity: { green: 60, yellow: 40, red: 0 }
-            grid_options: { columns: 4 }
-          - type: gauge
-            entity: sensor.solar_charger_cobertura_solar_mes
-            name: Mes
-            min: 0
-            max: 100
-            needle: true
-            severity: { green: 60, yellow: 40, red: 0 }
-            grid_options: { columns: 4 }
-          - type: gauge
-            entity: sensor.solar_charger_cobertura_solar_ano
-            name: Año
-            min: 0
-            max: 100
-            needle: true
-            severity: { green: 60, yellow: 40, red: 0 }
-            grid_options: { columns: 4 }
-          - type: entities
-            entities:
-              - entity: sensor.solar_charger_proyeccion_cobertura_ano
-                name: Proyección a 31 dic
-              - entity: sensor.solar_charger_autoconsumo_ano
-                name: Autoconsumido este año
-              - entity: sensor.solar_charger_consumo_total_ano
-                name: Consumo total (hogar + cargador)
-              - entity: sensor.solar_charger_faltan_para_objetivo
-                name: Faltan para el objetivo
-
-      # ---------------------------------------------------------------- Gráficos
+      # ------------------------------------------------------------------ GRÁFICAS DE HOY
       - type: grid
         column_span: 2
         cards:
           - type: heading
-            heading: Hoy por horas
+            heading: Hoy
+            heading_style: title
             icon: mdi:chart-bar
           - type: custom:apexcharts-card
             graph_span: 24h
             span: { start: day }
-            header: { show: false }
+            header:
+              show: true
+              title: Energía por hora (kWh)
+            now: { show: true, label: Ahora }
             apex_config:
-              chart: { height: 260 }
-              legend: { show: true }
+              chart: { height: 300 }
+              plotOptions: { bar: { columnWidth: "85%", borderRadius: 2 } }
+              legend: { show: true, position: top }
+              dataLabels: { enabled: false }
+              xaxis: { labels: { format: "HH" } }
+              tooltip: { x: { format: "HH:00" } }
             yaxis:
               - min: 0
                 decimals: 1
-                apex_config: { title: { text: kWh } }
             series:
               - entity: sensor.solar_charger_generacion_hora
-                name: Generación
+                name: Placas
                 type: column
-                color: "#f2a93b"
+                color: "#F2A93B"
+                stack_group: placas
                 group_by: { func: max, duration: 1h }
+                show: { legend_value: false }
               - entity: sensor.solar_charger_consumo_hogar_hora
                 name: Hogar
                 type: column
-                color: "#5b8bd0"
+                color: "#5B8BD0"
+                stack_group: consumo
                 group_by: { func: max, duration: 1h }
+                show: { legend_value: false }
               - entity: sensor.solar_charger_consumo_cargador_hora
-                name: Cargador
+                name: Coche
                 type: column
-                color: "#2fb5a0"
+                color: "#2FB5A0"
+                stack_group: consumo
                 group_by: { func: max, duration: 1h }
+                show: { legend_value: false }
           - type: custom:apexcharts-card
-            graph_span: 48h
-            header: { show: true, title: Saldo neto por hora (Wh), show_states: false }
+            graph_span: 24h
+            span: { start: day }
+            header:
+              show: true
+              title: Saldo de cada hora (kWh) · verde = sin coste de red
             apex_config:
               chart: { height: 220 }
+              plotOptions: { bar: { columnWidth: "85%", borderRadius: 2 } }
+              legend: { show: false }
+              dataLabels: { enabled: false }
+              xaxis: { labels: { format: "HH" } }
+              tooltip: { x: { format: "HH:00" } }
+              annotations:
+                yaxis:
+                  - y: 0
+                    borderColor: "#888"
+            yaxis:
+              - decimals: 1
             series:
               - entity: sensor.solar_charger_saldo_ultima_hora
                 name: Saldo
                 type: column
+                transform: "return x / 1000;"
+                unit: kWh
+                offset: "-1h"
                 group_by: { func: last, duration: 1h }
+                show: { legend_value: false }
                 color_threshold:
-                  - { value: -100000, color: "#e0645c" }
-                  - { value: 0, color: "#4caf6a" }
+                  - { value: -100, color: "#E0645C" }
+                  - { value: 0, color: "#4CAF6A" }
 
-      # ---------------------------------------------------------------- Coche
+      # ------------------------------------------------------------------ OBJETIVO Y AHORRO
+      - type: grid
+        cards:
+          - type: heading
+            heading: Objetivo anual
+            heading_style: title
+            icon: mdi:flag-checkered
+          - type: gauge
+            entity: sensor.solar_charger_cobertura_solar_ano
+            name: Cobertura solar del año
+            min: 0
+            max: 100
+            needle: true
+            severity: { green: 60, yellow: 40, red: 0 }
+          - type: custom:mushroom-template-card
+            primary: >-
+              Proyección a 31 dic: {{ states('sensor.solar_charger_proyeccion_cobertura_ano') | float(0) | round(0) }} %
+              (objetivo 60 %)
+            secondary: >-
+              Hoy {{ states('sensor.solar_charger_cobertura_solar_hoy') | float(0) | round(0) }} % ·
+              mes {{ states('sensor.solar_charger_cobertura_solar_mes') | float(0) | round(0) }} % ·
+              faltan {{ states('sensor.solar_charger_faltan_para_objetivo') | float(0) | round(0) }} kWh solares
+            multiline_secondary: true
+            icon: mdi:chart-line
+            icon_color: >-
+              {{ 'green' if states('sensor.solar_charger_proyeccion_cobertura_ano') | float(0) >= 60 else 'orange' }}
+          - type: custom:mushroom-template-card
+            primary: >-
+              Ahorro: {{ states('sensor.solar_charger_ahorro_mes') | float(0) | round(2) }} € este mes
+            secondary: >-
+              Hoy {{ states('sensor.solar_charger_ahorro_hoy') | float(0) | round(2) }} € ·
+              año {{ states('sensor.solar_charger_ahorro_ano') | float(0) | round(2) }} € (sin impuestos)
+            icon: mdi:piggy-bank
+            icon_color: green
+
+      # ------------------------------------------------------------------ COCHE
       - type: grid
         cards:
           - type: heading
             heading: Coche
+            heading_style: title
             icon: mdi:car-electric
-          - type: custom:mushroom-entity-card
+          - type: custom:mushroom-template-card
             entity: sensor.solar_charger_bateria_coche_estimada
-            name: Batería estimada
+            primary: "Batería ≈ {{ states('sensor.solar_charger_bateria_coche_estimada') | float(0) | round(0) }} %"
+            secondary: >-
+              Último dato real {{ state_attr('sensor.solar_charger_bateria_coche_estimada', 'ultimo_dato_real') or '—' }} %
+            icon: mdi:battery-charging-60
             icon_color: teal
-          - type: markdown
-            content: >-
-              Último dato real: {{ state_attr('sensor.solar_charger_bateria_coche_estimada', 'ultimo_dato_real') or '—' }} %
-          - type: entities
-            entities:
-              - entity: sensor.solar_charger_coche_cargado_hoy
-                name: Cargado hoy
-              - entity: sensor.solar_charger_coche_solar_hoy
-                name: De origen solar hoy
-              - entity: sensor.solar_charger_coche_cargado_mes
-                name: Cargado este mes
-              - entity: sensor.solar_charger_coche_solar_mes
-                name: De origen solar este mes
+          - type: custom:mushroom-template-card
+            primary: >-
+              Hoy {{ states('sensor.solar_charger_coche_cargado_hoy') | float(0) | round(1) }} kWh ·
+              {{ states('sensor.solar_charger_coche_solar_hoy') | float(0) | round(0) }} % solar
+            secondary: >-
+              Este mes {{ states('sensor.solar_charger_coche_cargado_mes') | float(0) | round(1) }} kWh ·
+              {{ states('sensor.solar_charger_coche_solar_mes') | float(0) | round(0) }} % solar
+            icon: mdi:ev-plug-type2
+            icon_color: teal
 
-      # ---------------------------------------------------------------- Ahorro
+      # ------------------------------------------------------------------ ÚLTIMOS 30 DÍAS
       - type: grid
+        column_span: 2
         cards:
           - type: heading
-            heading: Ahorro estimado (sin impuestos)
-            icon: mdi:piggy-bank
-          - type: custom:mushroom-entity-card
-            entity: sensor.solar_charger_ahorro_hoy
-            name: Hoy
-            layout: vertical
-            grid_options: { columns: 4 }
-          - type: custom:mushroom-entity-card
-            entity: sensor.solar_charger_ahorro_mes
-            name: Mes
-            layout: vertical
-            grid_options: { columns: 4 }
-          - type: custom:mushroom-entity-card
-            entity: sensor.solar_charger_ahorro_ano
-            name: Año
-            layout: vertical
-            grid_options: { columns: 4 }
+            heading: Últimos 30 días
+            heading_style: title
+            icon: mdi:calendar-month
+          - type: custom:apexcharts-card
+            graph_span: 30d
+            span: { end: day }
+            header:
+              show: true
+              title: Carga del coche por día (kWh) y cobertura solar (%)
+            apex_config:
+              chart: { height: 300 }
+              plotOptions: { bar: { columnWidth: "75%", borderRadius: 2 } }
+              legend: { show: true, position: top }
+              dataLabels: { enabled: false }
+              xaxis: { labels: { format: "dd/MM" } }
+              tooltip: { x: { format: "dd/MM" } }
+              annotations:
+                yaxis:
+                  - y: 60
+                    yAxisIndex: 1
+                    borderColor: "#4CAF6A"
+                    strokeDashArray: 4
+                    label: { text: "Objetivo 60 %", style: { background: "#4CAF6A", color: "#fff" } }
+            yaxis:
+              - id: kwh
+                min: 0
+                decimals: 0
+              - id: pct
+                opposite: true
+                min: 0
+                max: 100
+                decimals: 0
+            series:
+              - entity: sensor.solar_charger_coche_solar_ayer
+                name: Coche · solar
+                type: column
+                yaxis_id: kwh
+                color: "#F2A93B"
+                stack_group: coche
+                offset: "-1d"
+                statistics: { type: mean, period: day }
+                show: { legend_value: false }
+              - entity: sensor.solar_charger_coche_red_ayer
+                name: Coche · red
+                type: column
+                yaxis_id: kwh
+                color: "#8A94A6"
+                stack_group: coche
+                offset: "-1d"
+                statistics: { type: mean, period: day }
+                show: { legend_value: false }
+              - entity: sensor.solar_charger_cobertura_solar_ayer
+                name: Cobertura solar
+                type: line
+                yaxis_id: pct
+                color: "#2FB5A0"
+                stroke_width: 3
+                offset: "-1d"
+                statistics: { type: mean, period: day }
+                show: { legend_value: false }
 
-      # ---------------------------------------------------------------- Control
+      # ------------------------------------------------------------------ CARGA FORZADA
       - type: grid
         cards:
           - type: heading
             heading: Carga forzada
+            heading_style: title
             icon: mdi:calendar-clock
           - type: entities
             state_color: true
             entities:
-              - entity: switch.solar_charger_control_automatico
-                name: Control automático
               - entity: sensor.solar_charger_carga_forzada_estado
                 name: Estado
               - entity: text.solar_charger_carga_forzada_inicio
-                name: Inicio (AAAA-MM-DD HH:MM o HH:MM)
+                name: Inicio (HH:MM o AAAA-MM-DD HH:MM)
               - entity: number.solar_charger_carga_forzada_duracion
                 name: Duración
               - entity: number.solar_charger_carga_forzada_intensidad
                 name: Intensidad
-          - type: button
-            entity: button.solar_charger_programar_carga_forzada
-            name: Programar
-            icon: mdi:calendar-plus
-            tap_action:
-              action: perform-action
-              perform_action: button.press
-              target: { entity_id: button.solar_charger_programar_carga_forzada }
-            grid_options: { columns: 6 }
-          - type: button
-            entity: button.solar_charger_cancelar_carga_forzada
-            name: Cancelar
-            icon: mdi:calendar-remove
-            tap_action:
-              action: perform-action
-              perform_action: button.press
-              target: { entity_id: button.solar_charger_cancelar_carga_forzada }
-            grid_options: { columns: 6 }
+              - type: buttons
+                entities:
+                  - entity: button.solar_charger_programar_carga_forzada
+                    name: Programar
+                    icon: mdi:calendar-plus
+                    tap_action:
+                      action: perform-action
+                      perform_action: button.press
+                      target: { entity_id: button.solar_charger_programar_carga_forzada }
+                  - entity: button.solar_charger_cancelar_carga_forzada
+                    name: Cancelar
+                    icon: mdi:calendar-remove
+                    tap_action:
+                      action: perform-action
+                      perform_action: button.press
+                      target: { entity_id: button.solar_charger_cancelar_carga_forzada }
+              - type: divider
+              - entity: switch.solar_charger_control_automatico
+                name: Control automático
 
-      # ---------------------------------------------------------------- Registro
+      # ------------------------------------------------------------------ REGISTRO
       - type: grid
         cards:
           - type: heading
-            heading: Decisiones e incidencias
+            heading: Últimos eventos
+            heading_style: title
             icon: mdi:text-box-outline
           - type: markdown
             content: >-
-              {% set evs = state_attr('sensor.solar_charger_ultimo_evento', 'eventos') or [] %}
-              {% for e in evs if e.level != 'debug' %}
-              {{ '🔴' if e.level == 'error' else '🟠' if e.level == 'warning' else '🟢' }}
-              **{{ e.time }}** {{ e.text }}
+              {% set evs = (state_attr('sensor.solar_charger_ultimo_evento', 'eventos') or [])
+                 | rejectattr('level', 'eq', 'debug') | list %}
+              {% for e in evs[:8] %}
+              {{ '🔴' if e.level == 'error' else '🟠' if e.level == 'warning' else '•' }}
+              **{{ e.time[-5:] }}** {{ e.text }}
 
               {% else %}Sin eventos{% endfor %}

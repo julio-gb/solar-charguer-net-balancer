@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0
+- Dashboard rediseñado: menos tarjetas, sin datos repetidos y gráficas más altas
+  (energía por hora apilada, saldo de cada hora en kWh y vista de 30 días).
+- Nuevos sensores con el resumen del día anterior (cobertura solar, carga del coche
+  solar y de red) para las gráficas de 30 días.
+
 ## 0.4.3
 - Si la potencia del cargador deja de leerse (microcorte, reinicio), la energía de ese
   tramo se toma del contador para no infravalorar lo cargado.

@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 from .charger import Charger, ChargerEntities, ChargerReadings
 from .config import Config
 from .controller import ControlInputs, ControlParams, decide, minutes_left_in_hour
-from .energy import CounterTracker, HourRecord, compute_stats
+from .energy import CounterTracker, HourRecord, compute_stats, coverage
 from .forced import ForcedCharge, ScheduleError, parse_start
 from .ha_client import HAClient, HAError, is_available, to_float
 from .soc import SocEstimator
@@ -18,7 +18,7 @@ from .storage import save_state
 from .tariff import Tariff
 
 _LOGGER = logging.getLogger(__name__)
-VERSION = "0.4.3"
+VERSION = "0.5.0"
 KEEP_DAYS = 400
 TRACE_LEN = 2500
 NOTIFICATION_ID = "solar_charger_balancer_offline"
@@ -457,6 +457,12 @@ class Balancer:
         p("ev_solar_share_month", r1(stats.ev_solar_share_month))
         p("soc_estimated", r1(self.soc.estimate(self.ev_total)),
           {"ultimo_dato_real": self.soc.anchor_soc, "fecha_dato_real": self.soc.anchor_stamp})
+        yesterday = [r for r in closed if r.start.date() == (now - timedelta(days=1)).date()]
+        if yesterday:
+            ev_solar = sum(r.ev_solar for r in yesterday)
+            p("coverage_yesterday", r1(coverage(yesterday)))
+            p("ev_solar_yesterday", round(ev_solar, 2))
+            p("ev_grid_yesterday", round(sum(r.ev for r in yesterday) - ev_solar, 2))
         p("savings_today", round(stats.savings_today, 2))
         p("savings_month", round(stats.savings_month, 2))
         p("savings_year", round(stats.savings_year, 2))
