@@ -18,7 +18,7 @@ from .storage import save_state
 from .tariff import Tariff
 
 _LOGGER = logging.getLogger(__name__)
-VERSION = "0.5.1"
+VERSION = "0.5.2"
 KEEP_DAYS = 400
 TRACE_LEN = 2500
 NOTIFICATION_ID = "solar_charger_balancer_offline"
@@ -429,7 +429,15 @@ class Balancer:
         d = self.decision
         r1 = lambda v, n=1: None if v is None else round(v, n)  # noqa: E731
         mode = self.mode if self.charger.online else f"{self.mode} · cargador sin conexión"
-        p("mode", mode, {"motivo": d.reason if d else None, "disponible_wh": round(d.available_wh) if d else None,
+        if not self.charger.car_connected and not (self.forced and self.forced.is_active(now)):
+            reason = f"El cargador indica «{self.charger.state_text}»: no se carga hasta que conectes el coche"
+        elif not self.enabled:
+            reason = "Control automático desactivado: el addon no envía órdenes al cargador"
+        elif self.forced and self.forced.is_active(now):
+            reason = f"Carga forzada hasta las {self.forced.end:%H:%M}"
+        else:
+            reason = d.reason if d else None
+        p("mode", mode, {"motivo": reason, "disponible_wh": round(d.available_wh) if d else None,
                          "ultima_decision": self.last_decision_at.isoformat() if self.last_decision_at else None})
         pw = self.powers
         p("power_generation", r1(pw["gen"], 3))

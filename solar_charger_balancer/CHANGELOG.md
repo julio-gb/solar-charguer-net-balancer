@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.2
+- El motivo del modo explica por qué no se carga (coche desconectado, control desactivado,
+  carga forzada) en lugar de «Esperando la primera decisión».
+
 ## 0.5.1
 - Nuevo sensor «Histórico diario» con los últimos 30 días (carga solar/red del coche y
   cobertura) en un atributo: las gráficas de 30 días se ven al momento, sin esperar a
