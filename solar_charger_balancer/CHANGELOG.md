@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.1
+- Nuevo sensor «Previsión factura mes»: lo ya consumido más la media de los últimos 7 días
+  completos para los días que quedan (y los del mes sin datos). Incluye el coste por día
+  del mes para las gráficas.
+- Dashboard: tabla Hoy / Ayer / Mes sin textos cortados, gráficas de coste diario y
+  acumulado con previsión, y ventana con el desglose de la factura.
+
 ## 0.6.0
 - Factura estimada con impuestos: sensores «Coste hoy», «Coste ayer» y «Coste mes» con
   desglose (potencia, energía, excedentes, bono social, alquiler, impuesto eléctrico, IVA).

@@ -44,3 +44,23 @@ def test_solar_value_uses_hour_price_and_taxes():
     records = [_rec(3, 2, 0.1976), _rec(1, 4, 0.0872)]  # 2 kWh y 1 kWh autoconsumidos
     expected = (2 * 0.1976 + 1 * 0.0872) * 1.0511269632 * 1.21
     assert solar_value(records, cfg) == pytest.approx(expected)
+
+
+def test_month_forecast_uses_recent_complete_days():
+    from datetime import date, datetime, timedelta
+
+    from solar_balancer.billing import month_forecast
+
+    cfg = make_config()
+    start = datetime.fromisoformat("2026-10-12T00:00:00+02:00")
+    # Del 12 al 21 de octubre: días completos de 24 h con 0,5 kWh por hora a 0,1 €/kWh; hoy (22) a medias.
+    records = [HourRecord((start + timedelta(hours=h)).isoformat(), 0, 0.5, 0, 0.1, 0.02) for h in range(10 * 24 + 9)]
+    fc = month_forecast(records, date(2026, 10, 22), cfg)
+    day_cost = compute_bill(records[:24], 1, cfg).total
+    assert fc["dias_base"] == 7 and fc["media_diaria"] == pytest.approx(day_cost, abs=0.01)
+    assert fc["dias_sin_datos"] == 11                         # del 1 al 11 sin datos del addon
+    assert fc["total"] == pytest.approx(31 * day_cost, abs=0.05)
+    assert fc["prevision"][0]["d"] == "2026-10-21" and fc["prevision"][-1]["d"] == "2026-10-31"
+    assert [r["d"] for r in fc["dias"]][-1] == "2026-10-22"
+    row = fc["dias"][0]
+    assert row["fijo"] + row["energia"] + row["impuestos"] == pytest.approx(row["total"], abs=0.02)

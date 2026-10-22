@@ -79,6 +79,8 @@ Sensores con impuestos incluidos, calculados con el balance neto de cada hora:
   incluidos. Si superan el coste de la energía, el sobrante se descuenta del total
   (Solar Wallet). El atributo `linea_factura_mes` es el importe sin impuestos que aparece
   en la línea «Excedente de energía».
+- **Previsión factura mes**: lo ya consumido en días cerrados más la media de los últimos
+  7 días completos para hoy, los días que quedan y los días del mes sin datos.
 
 Los importes fijos (potencia, bono social, alquiler, impuestos) se configuran en la sección
 **Factura** de Ajustes. Es una estimación: la factura real usa las lecturas del contador.

@@ -107,6 +107,7 @@ ENTITIES: list[Entity] = [
     _sensor("cost_today", "Coste hoy", "EUR", "monetary", None, "mdi:receipt-text", 2, attrs=True),
     _sensor("cost_yesterday", "Coste ayer", "EUR", "monetary", None, "mdi:receipt-text-clock", 2, attrs=True),
     _sensor("cost_month", "Coste mes", "EUR", "monetary", None, "mdi:receipt-text-outline", 2, attrs=True),
+    _sensor("bill_forecast", "Previsión factura mes", "EUR", "monetary", None, "mdi:crystal-ball", 2, attrs=True),
     _sensor("solar_value", "Valor solar autoconsumida", "EUR", "monetary", None, "mdi:solar-power-variant", 2, attrs=True),
     _sensor("surplus_discount", "Descuento excedentes", "EUR", "monetary", None, "mdi:cash-refund", 2, attrs=True),
     _sensor("current_price", "Precio actual", "EUR/kWh", None, None, "mdi:cash", 3),
@@ -154,7 +155,7 @@ class MqttBridge:
 
     def _device(self) -> dict:
         return {"identifiers": [PREFIX], "name": DEVICE_NAME, "manufacturer": "Solar Charger Net Balancer",
-                "model": "Addon Home Assistant", "sw_version": "0.6.0"}
+                "model": "Addon Home Assistant", "sw_version": "0.6.1"}
 
     def _discovery(self, entity: Entity) -> dict:
         payload: dict[str, Any] = {

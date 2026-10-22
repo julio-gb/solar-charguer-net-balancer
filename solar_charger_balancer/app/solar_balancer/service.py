@@ -7,7 +7,7 @@ from collections import deque
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from .billing import compensation_effect, compute_bill, solar_value
+from .billing import compensation_effect, compute_bill, month_forecast, solar_value
 from .charger import Charger, ChargerEntities, ChargerReadings
 from .config import Config
 from .controller import ControlInputs, ControlParams, decide, minutes_left_in_hour
@@ -19,7 +19,7 @@ from .storage import save_state
 from .tariff import Tariff
 
 _LOGGER = logging.getLogger(__name__)
-VERSION = "0.6.0"
+VERSION = "0.6.1"
 KEEP_DAYS = 400
 TRACE_LEN = 2500
 NOTIFICATION_ID = "solar_charger_balancer_offline"
@@ -528,6 +528,11 @@ class Balancer:
             **{k: round(v, 2) for k, v in discount.items()},
             "kwh_mes": round(sum(r.grid_export for r in month), 2),
             "linea_factura_mes": round(-sum(r.grid_export * r.compensation for r in month), 2)})
+
+        recent = [r for r in closed if r.start >= now - timedelta(days=40)] + [current]
+        fc = month_forecast(recent, now.date(), cfg)
+        total = fc.pop("total")
+        p("bill_forecast", None if total is None else round(total, 2), fc)
 
     async def run(self, stop: asyncio.Event) -> None:
         save_every = max(1, 300 // self.cfg.poll_interval_seconds)
