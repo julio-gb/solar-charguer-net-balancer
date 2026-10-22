@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0
+- Factura estimada con impuestos: sensores «Coste hoy», «Coste ayer» y «Coste mes» con
+  desglose (potencia, energía, excedentes, bono social, alquiler, impuesto eléctrico, IVA).
+- «Valor solar autoconsumida»: lo que habría costado la solar consumida, al precio de su hora.
+- «Descuento excedentes»: rebaja de la factura por la energía vertida, impuestos incluidos.
+- Nueva sección «Factura» en Ajustes y en el dashboard.
+- Precios por defecto ajustados a la factura de Octopus 3 (0,1976 / 0,1186 / 0,0872 €/kWh).
+
 ## 0.5.2
 - El motivo del modo explica por qué no se carga (coche desconectado, control desactivado,
   carga forzada) en lugar de «Esperando la primera decisión».

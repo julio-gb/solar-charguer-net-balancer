@@ -7,6 +7,7 @@ from collections import deque
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from .billing import compensation_effect, compute_bill, solar_value
 from .charger import Charger, ChargerEntities, ChargerReadings
 from .config import Config
 from .controller import ControlInputs, ControlParams, decide, minutes_left_in_hour
@@ -18,7 +19,7 @@ from .storage import save_state
 from .tariff import Tariff
 
 _LOGGER = logging.getLogger(__name__)
-VERSION = "0.5.2"
+VERSION = "0.6.0"
 KEEP_DAYS = 400
 TRACE_LEN = 2500
 NOTIFICATION_ID = "solar_charger_balancer_offline"
@@ -473,6 +474,7 @@ class Balancer:
             p("ev_grid_yesterday", round(sum(r.ev for r in yesterday) - ev_solar, 2))
         days = daily_history(closed + [current], now, 30)
         p("daily_history", len(days), {"dias": days})
+        self._publish_billing(closed, current, now)
         p("savings_today", round(stats.savings_today, 2))
         p("savings_month", round(stats.savings_month, 2))
         p("savings_year", round(stats.savings_year, 2))
@@ -485,6 +487,47 @@ class Balancer:
         p("forced_start", self.forced_inputs["start"])
         p("forced_hours", float(self.forced_inputs["hours"]))
         p("forced_current", int(self.forced_inputs["current"]))
+
+    def _publish_billing(self, closed: list[HourRecord], current: HourRecord, now: datetime) -> None:
+        """Coste de la factura de hoy, ayer y el mes; valor de la solar y descuento por excedentes."""
+        p, cfg = self.pub.publish_state, self.cfg
+        year = [r for r in closed if r.start.year == now.year] + [current]
+        months: dict[int, list[HourRecord]] = {}
+        for r in year:
+            months.setdefault(r.start.month, []).append(r)
+
+        def days_of(recs):
+            # El término fijo cuenta desde el primer día con datos (no antes de que funcionara el addon).
+            first = min(r.start.date() for r in recs)
+            last = max(r.start.date() for r in recs)
+            return (last - first).days + 1
+
+        today = [r for r in months[now.month] if r.start.date() == now.date()]
+        yday = [r for r in closed if r.start.date() == (now - timedelta(days=1)).date()]
+        month = months[now.month]
+        periods = {"hoy": (today, 1), "ayer": (yday, 1), "mes": (month, days_of(month))}
+        for key, name in (("hoy", "cost_today"), ("ayer", "cost_yesterday"), ("mes", "cost_month")):
+            recs, days = periods[key]
+            if not recs:
+                continue
+            bill = compute_bill(recs, days, cfg)
+            attrs = bill.attributes()
+            if key == "mes":
+                attrs["desde"] = min(r.start.date() for r in recs).isoformat()
+            p(name, round(bill.total, 2), attrs)
+
+        value = {k: solar_value(recs, cfg) for k, (recs, _) in periods.items()}
+        value["ano"] = solar_value(year, cfg)
+        kwh = {k: sum(r.self_consumed for r in recs) for k, (recs, _) in periods.items()}
+        p("solar_value", round(value["mes"], 2), {**{k: round(v, 2) for k, v in value.items()},
+                                                 **{f"kwh_{k}": round(v, 2) for k, v in kwh.items()}})
+
+        discount = {k: compensation_effect(recs, days, cfg) if recs else 0.0 for k, (recs, days) in periods.items()}
+        discount["ano"] = sum(compensation_effect(recs, days_of(recs), cfg) for recs in months.values())
+        p("surplus_discount", round(discount["mes"], 2), {
+            **{k: round(v, 2) for k, v in discount.items()},
+            "kwh_mes": round(sum(r.grid_export for r in month), 2),
+            "linea_factura_mes": round(-sum(r.grid_export * r.compensation for r in month), 2)})
 
     async def run(self, stop: asyncio.Event) -> None:
         save_every = max(1, 300 // self.cfg.poll_interval_seconds)

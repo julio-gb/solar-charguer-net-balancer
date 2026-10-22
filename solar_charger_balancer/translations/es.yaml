@@ -29,6 +29,14 @@ configuration:
   disconnect_notify_minutes: { name: Aviso de desconexión tras (min) }
   coverage_target_percent: { name: Objetivo de cobertura solar anual (%) }
   compensation_price: { name: Compensación de excedentes (€/kWh) }
+  contracted_power_p1_kw: { name: Potencia contratada punta P1 (kW) }
+  contracted_power_p2_kw: { name: Potencia contratada valle P2 (kW) }
+  power_price_p1: { name: Precio potencia P1 (€/kW/día), description: "Sin impuestos." }
+  power_price_p2: { name: Precio potencia P2 (€/kW/día), description: "Sin impuestos." }
+  social_bonus_per_day: { name: Financiación del bono social (€/día) }
+  meter_rental_per_day: { name: Alquiler de equipos (€/día) }
+  electricity_tax_percent: { name: Impuesto eléctrico (%) }
+  vat_percent: { name: IVA (%) }
   car_battery_kwh: { name: Capacidad útil de la batería del coche (kWh) }
   charging_efficiency: { name: Eficiencia de carga (0,5–1) }
   holidays: { name: Festivos (AAAA-MM-DD) }

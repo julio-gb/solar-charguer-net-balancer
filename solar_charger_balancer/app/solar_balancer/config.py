@@ -53,6 +53,14 @@ class Config:
     disconnect_notify_minutes: int = 15
     coverage_target_percent: int = 60
     compensation_price: float = 0.02
+    contracted_power_p1_kw: float = 4.9
+    contracted_power_p2_kw: float = 4.9
+    power_price_p1: float = 0.097075
+    power_price_p2: float = 0.027075
+    social_bonus_per_day: float = 0.02466
+    meter_rental_per_day: float = 0.02663
+    electricity_tax_percent: float = 5.11269632
+    vat_percent: float = 21.0
     car_battery_kwh: float = 46.0
     charging_efficiency: float = 0.9
     holidays: frozenset[date] = field(default_factory=frozenset)

@@ -1,3 +1,4 @@
+import json
 """Prueba de humo: cliente HTTP real contra un HA simulado y publicación MQTT sin broker."""
 import asyncio
 from datetime import datetime
@@ -65,3 +66,11 @@ def test_smoke_poll_and_publish():
     assert published["solar_charger_balancer/power_grid/state"] == "-0.95"
     assert published["solar_charger_balancer/mode/state"].startswith("Solar")
     assert any(c[1] == "turn_on" for c in calls)                   # 0,95 kW de excedente → carga
+
+
+def test_smoke_publishes_bill_sensors():
+    _, published, _ = asyncio.run(_scenario())
+    for key in ("cost_today", "cost_month", "solar_value", "surplus_discount"):
+        assert float(published[f"solar_charger_balancer/{key}/state"]) >= 0
+    attrs = json.loads(published["solar_charger_balancer/cost_month/attributes"])
+    assert {"potencia", "energia", "compensacion", "impuesto_electrico", "iva", "desde"} <= set(attrs)

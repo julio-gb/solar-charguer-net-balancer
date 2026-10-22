@@ -67,6 +67,22 @@ está apagado no envía órdenes al cargador (la carga forzada programada sí se
 Si cambias la carga desde la app Z-Box con el control activado, el addon volverá a
 aplicar su propio estado en el siguiente ciclo.
 
+## Factura estimada
+Sensores con impuestos incluidos, calculados con el balance neto de cada hora:
+- **Coste hoy / ayer / mes**: potencia + energía importada − compensación de excedentes,
+  impuesto eléctrico, bono social, alquiler de equipos e IVA (mismo orden que la factura de
+  Octopus). Los atributos llevan el desglose. El mes es natural y los términos fijos cuentan
+  desde el primer día con datos del addon (atributo `desde`).
+- **Valor solar autoconsumida**: lo que habría costado la solar consumida al precio de su
+  hora, con impuesto eléctrico e IVA (atributos hoy, ayer, mes, año).
+- **Descuento excedentes**: cuánto rebajan los excedentes el total de la factura, impuestos
+  incluidos. Si superan el coste de la energía, el sobrante se descuenta del total
+  (Solar Wallet). El atributo `linea_factura_mes` es el importe sin impuestos que aparece
+  en la línea «Excedente de energía».
+
+Los importes fijos (potencia, bono social, alquiler, impuestos) se configuran en la sección
+**Factura** de Ajustes. Es una estimación: la factura real usa las lecturas del contador.
+
 ## Diagnóstico
 En la página de configuración, **Descargar diagnóstico** genera un JSON con la configuración,
 las horas cerradas de los últimos 14 días, los eventos y la traza de cada decisión (lecturas,

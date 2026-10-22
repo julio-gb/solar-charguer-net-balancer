@@ -65,6 +65,16 @@ SECTIONS = [
         {"key": "tariff_periods", "label": "Tramos de precio", "help": "Precios sin impuestos. «Festivo» incluye fines de semana y festivos.", "type": "tariffs"},
         _num("compensation_price", "Compensación de excedentes", "Lo que te pagan por cada kWh vertido.", "float", 0, 1, 0.001, "€/kWh"),
     ]},
+    {"title": "Factura", "fields": [
+        _num("contracted_power_p1_kw", "Potencia contratada punta (P1)", "", "float", 0.1, 15, 0.1, "kW"),
+        _num("contracted_power_p2_kw", "Potencia contratada valle (P2)", "", "float", 0.1, 15, 0.1, "kW"),
+        _num("power_price_p1", "Precio potencia punta (P1)", "Sin impuestos.", "float", 0, 1, 0.000001, "€/kW/día"),
+        _num("power_price_p2", "Precio potencia valle (P2)", "Sin impuestos.", "float", 0, 1, 0.000001, "€/kW/día"),
+        _num("social_bonus_per_day", "Financiación del bono social", "", "float", 0, 1, 0.00001, "€/día"),
+        _num("meter_rental_per_day", "Alquiler de equipos", "", "float", 0, 1, 0.00001, "€/día"),
+        _num("electricity_tax_percent", "Impuesto eléctrico", "", "float", 0, 30, 0.00000001, "%"),
+        _num("vat_percent", "IVA", "", "float", 0, 30, 0.1, "%"),
+    ]},
     {"title": "Objetivo", "fields": [
         _num("coverage_target_percent", "Cobertura solar anual objetivo", "Energía solar autoconsumida ÷ consumo total (hogar + cargador).", "int", 1, 100, 1, "%"),
     ]},

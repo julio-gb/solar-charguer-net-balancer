@@ -1,5 +1,5 @@
 name: Solar Charger Balancer
-version: "0.5.2"
+version: "0.6.0"
 slug: solar_charger_balancer
 description: Carga el coche con los excedentes solares usando el balance neto horario.
 url: https://github.com/julio-gb/solar-charguer-net-balancer
@@ -52,17 +52,25 @@ options:
   disconnect_notify_minutes: 15
   coverage_target_percent: 60
   compensation_price: 0.02
+  contracted_power_p1_kw: 4.9
+  contracted_power_p2_kw: 4.9
+  power_price_p1: 0.097075
+  power_price_p2: 0.027075
+  social_bonus_per_day: 0.02466
+  meter_rental_per_day: 0.02663
+  electricity_tax_percent: 5.11269632
+  vat_percent: 21
   car_battery_kwh: 46
   charging_efficiency: 0.9
   holidays: []
   tariff_periods:
-    - { days: laborable, start: "00:00", end: "08:00", price: 0.087 }
-    - { days: laborable, start: "08:00", end: "10:00", price: 0.119 }
-    - { days: laborable, start: "10:00", end: "14:00", price: 0.198 }
-    - { days: laborable, start: "14:00", end: "18:00", price: 0.119 }
-    - { days: laborable, start: "18:00", end: "22:00", price: 0.198 }
-    - { days: laborable, start: "22:00", end: "24:00", price: 0.119 }
-    - { days: festivo, start: "00:00", end: "24:00", price: 0.087 }
+    - { days: laborable, start: "00:00", end: "08:00", price: 0.0872 }
+    - { days: laborable, start: "08:00", end: "10:00", price: 0.1186 }
+    - { days: laborable, start: "10:00", end: "14:00", price: 0.1976 }
+    - { days: laborable, start: "14:00", end: "18:00", price: 0.1186 }
+    - { days: laborable, start: "18:00", end: "22:00", price: 0.1976 }
+    - { days: laborable, start: "22:00", end: "24:00", price: 0.1186 }
+    - { days: festivo, start: "00:00", end: "24:00", price: 0.0872 }
   log_level: info
 schema:
   generation_power_entity: str?
@@ -101,6 +109,14 @@ schema:
   disconnect_notify_minutes: int(1,1440)
   coverage_target_percent: int(1,100)
   compensation_price: float(0,)
+  contracted_power_p1_kw: float(0.1,15)
+  contracted_power_p2_kw: float(0.1,15)
+  power_price_p1: float(0,1)
+  power_price_p2: float(0,1)
+  social_bonus_per_day: float(0,1)
+  meter_rental_per_day: float(0,1)
+  electricity_tax_percent: float(0,30)
+  vat_percent: float(0,30)
   car_battery_kwh: float(1,)
   charging_efficiency: float(0.5,1)
   holidays:

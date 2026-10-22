@@ -57,6 +57,10 @@ class HourRecord:
         return max(0.0, self.consumption - self.gen)
 
     @property
+    def grid_export(self) -> float:
+        return max(0.0, self.gen - self.consumption)
+
+    @property
     def balance(self) -> float:
         return self.gen - self.consumption
 

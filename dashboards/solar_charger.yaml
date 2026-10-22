@@ -1,4 +1,4 @@
-# Dashboard «Carga solar» del addon Solar Charger Balancer (v0.7).
+# Dashboard «Carga solar» del addon Solar Charger Balancer (v0.8).
 # Tarjetas de HACS que usa: Mushroom, ApexCharts Card, mini-graph-card,
 # Multiple Entity Row, auto-entities, Bubble Card (ventanas emergentes) y Energy Custom Graph Card.
 # Uso: abrir el panel → ✏️ → ⋮ → Editor de configuración en bruto → pegar todo → Guardar.
@@ -199,7 +199,85 @@ views:
                 show_in_legend: true
                 show_in_tooltip: true
 
-      # ================================================================== OBJETIVO Y AHORRO
+      # ================================================================== FACTURA
+      - type: grid
+        cards:
+          - type: heading
+            heading: Factura
+            icon: mdi:receipt-text
+          - type: custom:mushroom-template-card
+            entity: sensor.solar_charger_coste_mes
+            primary: >-
+              Este mes: {{ '%.2f' | format(states(entity) | float(0)) | replace('.', ',') }} €
+            secondary: >-
+              {% macro e(k) %}{{ '%.2f' | format(state_attr('sensor.solar_charger_coste_mes', k) | float(0)) | replace('.', ',') }} €{% endmacro %}
+              {% set imp = (state_attr(entity, 'impuesto_electrico') | float(0)) + (state_attr(entity, 'iva') | float(0)) %}
+              {% set desde = state_attr(entity, 'desde') or '' %}
+              Potencia {{ e('potencia') }} · Energía {{ e('energia') }} ·
+              Excedentes {{ e('compensacion') }} · Bono y contador {{ e('bono_social_y_alquiler') }} ·
+              Impuestos {{ '%.2f' | format(imp) | replace('.', ',') }} €
+              {%- if (state_attr(entity, 'solar_wallet') | float(0)) < 0 %} · Solar Wallet {{ e('solar_wallet') }}{% endif %}
+              {%- if desde | length == 10 %} · datos desde el {{ desde[8:10] | int }}/{{ desde[5:7] | int }}{% endif %}
+            multiline_secondary: true
+            icon: mdi:receipt-text-outline
+            color: blue
+            grid_options: { columns: full }
+          - type: entities
+            entities:
+              - entity: sensor.solar_charger_coste_hoy
+                type: custom:multiple-entity-row
+                name: Coste con impuestos
+                icon: mdi:receipt-text
+                state_header: Hoy
+                unit: €
+                format: precision2
+                entities:
+                  - entity: sensor.solar_charger_coste_ayer
+                    name: Ayer
+                    unit: €
+                    format: precision2
+              - entity: sensor.solar_charger_valor_solar_autoconsumida
+                type: custom:multiple-entity-row
+                name: Solar consumida, a precio de red
+                icon: mdi:solar-power-variant
+                state_header: Mes
+                unit: €
+                format: precision2
+                entities:
+                  - attribute: hoy
+                    name: Hoy
+                    unit: €
+                    format: precision2
+                  - attribute: ayer
+                    name: Ayer
+                    unit: €
+                    format: precision2
+                  - attribute: ano
+                    name: Año
+                    unit: €
+                    format: precision2
+              - entity: sensor.solar_charger_descuento_excedentes
+                type: custom:multiple-entity-row
+                name: Descuento por excedentes
+                icon: mdi:cash-refund
+                state_header: Mes
+                unit: €
+                format: precision2
+                entities:
+                  - attribute: hoy
+                    name: Hoy
+                    unit: €
+                    format: precision2
+                  - attribute: ayer
+                    name: Ayer
+                    unit: €
+                    format: precision2
+                  - attribute: ano
+                    name: Año
+                    unit: €
+                    format: precision2
+
+      # ================================================================== OBJETIVO ANUAL
       - type: grid
         cards:
           - type: heading
@@ -232,22 +310,6 @@ views:
               - entity: sensor.solar_charger_faltan_para_objetivo
                 name: Faltan para el 60 %
                 icon: mdi:flag-checkered
-              - entity: sensor.solar_charger_ahorro_ano
-                type: custom:multiple-entity-row
-                name: Ahorro (sin impuestos)
-                icon: mdi:piggy-bank
-                state_header: Año
-                unit: €
-                format: precision2
-                entities:
-                  - entity: sensor.solar_charger_ahorro_hoy
-                    name: Hoy
-                    unit: €
-                    format: precision2
-                  - entity: sensor.solar_charger_ahorro_mes
-                    name: Mes
-                    unit: €
-                    format: precision2
 
       # ================================================================== COCHE
       - type: grid

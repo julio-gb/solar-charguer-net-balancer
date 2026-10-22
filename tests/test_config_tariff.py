@@ -23,11 +23,11 @@ def test_missing_entity_rejected():
 
 
 @pytest.mark.parametrize("when,price", [
-    (datetime(2026, 10, 12, 3, 0), 0.087),    # lunes valle
-    (datetime(2026, 10, 12, 9, 30), 0.119),   # lunes llano
-    (datetime(2026, 10, 12, 11, 0), 0.198),   # lunes punta
-    (datetime(2026, 10, 12, 23, 59), 0.119),  # lunes 22-24
-    (datetime(2026, 10, 10, 11, 0), 0.087),   # sábado
+    (datetime(2026, 10, 12, 3, 0), 0.0872),    # lunes valle
+    (datetime(2026, 10, 12, 9, 30), 0.1186),   # lunes llano
+    (datetime(2026, 10, 12, 11, 0), 0.1976),   # lunes punta
+    (datetime(2026, 10, 12, 23, 59), 0.1186),  # lunes 22-24
+    (datetime(2026, 10, 10, 11, 0), 0.0872),   # sábado
 ])
 def test_prices(when, price):
     assert Tariff(make_config()).price_at(when) == price
@@ -35,8 +35,8 @@ def test_prices(when, price):
 
 def test_holiday_and_workday_sensor():
     tariff = Tariff(make_config(holidays=["2026-10-12"]))
-    assert tariff.price_at(datetime(2026, 10, 12, 11, 0)) == 0.087
-    assert tariff.price_at(datetime(2026, 10, 12, 11, 0), workday_override=True) == 0.198
+    assert tariff.price_at(datetime(2026, 10, 12, 11, 0)) == 0.0872
+    assert tariff.price_at(datetime(2026, 10, 12, 11, 0), workday_override=True) == 0.1976
 
 
 def test_button_start_requires_stop_and_old_switch_key_migrates():
