@@ -252,11 +252,13 @@ views:
               tooltip: { x: { format: "dd/MM" } }
             yaxis:
               - decimals: 1
+                apex_config: { tickAmount: 4 }
             series:
               # Datos del sensor «Previsión factura mes» (atributo dias: un elemento por día del mes).
               - entity: sensor.solar_charger_prevision_factura_mes
                 name: Fijo
                 type: column
+                stack_group: coste
                 color: "#8A94A6"
                 float_precision: 2
                 data_generator: |
@@ -265,6 +267,7 @@ views:
               - entity: sensor.solar_charger_prevision_factura_mes
                 name: Energía
                 type: column
+                stack_group: coste
                 color: "#4A90D9"
                 float_precision: 2
                 data_generator: |
@@ -273,6 +276,7 @@ views:
               - entity: sensor.solar_charger_prevision_factura_mes
                 name: Impuestos
                 type: column
+                stack_group: coste
                 color: "#E0A030"
                 float_precision: 2
                 data_generator: |
@@ -418,6 +422,7 @@ views:
               - entity: sensor.solar_charger_historico_diario
                 name: Con sol
                 type: column
+                stack_group: coche
                 color: "#F2A93B"
                 float_precision: 1
                 data_generator: |
@@ -426,6 +431,7 @@ views:
               - entity: sensor.solar_charger_historico_diario
                 name: De la red
                 type: column
+                stack_group: coche
                 color: "#8A94A6"
                 float_precision: 1
                 data_generator: |
