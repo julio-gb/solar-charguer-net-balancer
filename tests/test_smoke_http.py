@@ -80,7 +80,8 @@ def test_smoke_stats_view_and_month_split():
     _, published, balancer = asyncio.run(_scenario())
     assert published["solar_charger_balancer/stats_view/state"] == "General"
     attrs = json.loads(published["solar_charger_balancer/daily_history/attributes"])
-    assert set(attrs["mes"]) == {"total_solar", "total_red", "coche_solar", "coche_red", "hogar_solar", "hogar_red"}
+    assert {"total_solar", "total_red", "coche_solar", "coche_red", "hogar_solar", "hogar_red",
+            "coche_red_eur", "hogar_red_eur"} <= set(attrs["mes"])
     balancer.handle_command("stats_view", "Hogar")
     balancer.handle_command("stats_view", "Otra")                  # se ignora
     assert balancer.stats_view == "Hogar" and balancer.snapshot()["stats_view"] == "Hogar"

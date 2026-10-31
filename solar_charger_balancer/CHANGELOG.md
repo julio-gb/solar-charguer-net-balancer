@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.1
+- «Histórico diario» incluye el coste de la energía comprada a la red del coche y del hogar
+  (precio de cada hora con impuesto eléctrico e IVA).
+- Dashboard: sección «Comprado a la red · 30 días» con coche frente a hogar en kWh y €.
+
 ## 0.8.0
 - Cuadre con la distribuidora: nuevo sensor «Diferencia con Datadis» que compara, hora a hora,
   el consumo del contador (estadísticas de la integración e-data) con el que mide el addon,

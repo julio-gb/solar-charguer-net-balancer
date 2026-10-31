@@ -161,18 +161,21 @@ def compute_stats(records: list[HourRecord], current: HourRecord, now: datetime,
     )
 
 
-def _split(recs) -> dict:
-    """kWh con sol y de la red del total, del coche y del hogar."""
+def _split(recs, tax_factor: float = 1.0) -> dict:
+    """kWh con sol y de la red del total, del coche y del hogar, y lo que cuesta la energía
+    importada de cada uno (precio de su hora × impuestos; sin potencia ni excedentes)."""
     out = {}
     for key, total, solar in (("total", "consumption", "self_consumed"), ("coche", "ev", "ev_solar"),
                               ("hogar", "home", "home_solar")):
         sol = _sum(recs, solar)
         out[f"{key}_solar"] = round(sol, 2)
         out[f"{key}_red"] = round(_sum(recs, total) - sol, 2)
+        cost = sum((getattr(r, total) - getattr(r, solar)) * r.price for r in recs) * tax_factor
+        out[f"{key}_red_eur"] = round(cost, 2)
     return out
 
 
-def daily_history(records: list[HourRecord], now: datetime, days: int) -> list[dict]:
+def daily_history(records: list[HourRecord], now: datetime, days: int, tax_factor: float = 1.0) -> list[dict]:
     """Resumen por día de los últimos `days` días (incluido hoy, en curso) para las gráficas.
 
     «solar» y «red» son del coche (se mantienen por compatibilidad con dashboards anteriores).
@@ -186,13 +189,13 @@ def daily_history(records: list[HourRecord], now: datetime, days: int) -> list[d
     out = []
     for day in sorted(by_day):
         recs = by_day[day]
-        split = _split(recs)
+        split = _split(recs, tax_factor)
         cov = coverage(recs)
         out.append({"d": day.isoformat(), "solar": split["coche_solar"], "red": split["coche_red"],
                     "cob": None if cov is None else round(cov, 1), **split})
     return out
 
 
-def month_split(records: list[HourRecord], now: datetime) -> dict:
+def month_split(records: list[HourRecord], now: datetime, tax_factor: float = 1.0) -> dict:
     """Reparto por origen del mes natural en curso."""
-    return _split([r for r in records if (r.start.year, r.start.month) == (now.year, now.month)])
+    return _split([r for r in records if (r.start.year, r.start.month) == (now.year, now.month)], tax_factor)
