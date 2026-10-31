@@ -21,7 +21,7 @@ from .storage import save_state
 from .tariff import Tariff
 
 _LOGGER = logging.getLogger(__name__)
-VERSION = "0.9.0"
+VERSION = "0.9.1"
 KEEP_DAYS = 400
 TRACE_LEN = 2500
 # Una potencia doméstica mayor que esto es una lectura errónea del sensor (p. ej. el Beny
@@ -591,7 +591,8 @@ class Balancer:
             return
         self.datadis_due = now + timedelta(hours=3)
         try:
-            self.datadis = await asyncio.wait_for(datadis.fetch(self.ha, now, self.tz), 60)
+            self.datadis = await asyncio.wait_for(datadis.fetch(self.ha, now, self.tz,
+                                                                  generation_id=self.cfg.generation_energy_entity), 60)
         except (HAError, TimeoutError) as err:
             self.datadis.error = str(err)
             self.datadis_due = now + timedelta(minutes=30)
@@ -609,9 +610,10 @@ class Balancer:
         # Factura con el consumo del contador: mes en curso (con detalle por día) y mes anterior.
         price_at = lambda when: self.tariff.price_at(when) or 0.0  # noqa: E731
         prev_month = (now.replace(day=1) - timedelta(days=1)).date()
-        current = datadis.month_bill(self.datadis.hourly, closed, now.date(), now, self.cfg, price_at, self.tz)
-        previous = datadis.month_bill(self.datadis.hourly, closed, prev_month, now, self.cfg, price_at, self.tz,
-                                      daily=False)
+        args = (self.datadis.hourly, closed)
+        gen = self.datadis.generation
+        current = datadis.month_bill(*args, now.date(), now, self.cfg, price_at, self.tz, generation=gen)
+        previous = datadis.month_bill(*args, prev_month, now, self.cfg, price_at, self.tz, daily=False, generation=gen)
         self.pub.publish_state("datadis_bill", current["total"] if current else None,
                                {"actual": current, "anterior": previous, "error": self.datadis.error})
 

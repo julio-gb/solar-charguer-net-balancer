@@ -162,7 +162,7 @@ class MqttBridge:
 
     def _device(self) -> dict:
         return {"identifiers": [PREFIX], "name": DEVICE_NAME, "manufacturer": "Solar Charger Net Balancer",
-                "model": "Addon Home Assistant", "sw_version": "0.9.0"}
+                "model": "Addon Home Assistant", "sw_version": "0.9.1"}
 
     def _discovery(self, entity: Entity) -> dict:
         payload: dict[str, Any] = {

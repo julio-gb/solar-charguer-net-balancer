@@ -813,7 +813,7 @@ views:
               {%- set sin = (a.get('horas') or {}).get('sin_solar', 0) + (p.get('horas') or {}).get('sin_solar', 0) %}
               {%- if sin > 0 %}
 
-              _⚠️ {{ sin }} horas sin registro de solar del addon: se calculan sin sol y su coste sale por encima del real._
+              _⚠️ {{ sin }} horas sin dato de solar (ni del addon ni en las estadísticas de HA): se calculan sin sol y su coste sale por encima del real._
               {%- endif %}
 
       # ================================================================== IMPORTADO DE LA RED (30 DÍAS)
@@ -1043,7 +1043,8 @@ views:
                   {%- for label, m in [('Este mes', a), ('Mes anterior', p)] if m %}
                   {%- set h = m.get('horas') or {} %}
 
-                  **{{ label }}** ({{ f(m.desde) }}–{{ f(m.hasta) }}): {{ h.get('contador', 0) }} h con contador y solar,
+                  **{{ label }}** ({{ f(m.desde) }}–{{ f(m.hasta) }}): {{ h.get('contador', 0) }} h con contador y solar del addon,
+                  {{ h.get('solar_ha', 0) }} h con contador y solar de las estadísticas de HA (antes del addon),
                   {{ h.get('addon', 0) }} h solo addon (Datadis aún no las publica){% if h.get('sin_solar', 0) %},
                   {{ h.get('sin_solar') }} h sin solar registrada (calculadas sin sol){% endif %}.
                   {%- set c = m.get('comparado') %}

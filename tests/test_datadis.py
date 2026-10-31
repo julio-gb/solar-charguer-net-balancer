@@ -50,6 +50,9 @@ class FakeHA:
         if msg["type"] == "recorder/list_statistic_ids":
             return [{"statistic_id": "edata:13kd_p1_consumption"}, {"statistic_id": "edata:13kd_consumption"}]
         start = int(datetime(2026, 10, 28, 1, 0, tzinfo=TZ).timestamp() * 1000)
+        if msg["period"] == "hour" and msg["statistic_ids"] == ["sensor.fv"]:
+            day1, day2 = start, start + 86400000      # 28/10 con sol; 29/10 con el sensor caído (0)
+            return {"sensor.fv": [{"start": day1, "change": 0.8}, {"start": day2, "change": 0.0}]}
         if msg["period"] == "hour":
             return {"edata:13kd_consumption": [{"start": start, "change": 0.3}, {"start": start + 3600000, "change": None}]}
         month = int(datetime(2026, 9, 1, tzinfo=TZ).timestamp() * 1000)
@@ -84,6 +87,11 @@ def test_merge_hours_uses_meter_and_addon_solar():
     assert recs[0].grid_import == pytest.approx(0.5)
     assert recs[1].gen == 0 and recs[1].home == 0.6 and recs[1].price == 0.15
     assert recs[2] is records[1]
+    # Sin registro del addon, la generación sale de las estadísticas de HA si las hay.
+    recs, source = datadis.merge_hours(hourly, records, h[0], h[2], lambda _: 0.15, 0.02, TZ,
+                                       {int(h[1].timestamp()): 0.4})
+    assert source[int(h[1].timestamp())] == "solar_ha" and recs[1].gen == 0.4
+    assert recs[1].grid_import == pytest.approx(0.2)
 
 
 def test_month_bill_with_meter_data():
@@ -96,9 +104,14 @@ def test_month_bill_with_meter_data():
             records.append(HourRecord(h.isoformat(), 0, 0.4, 0.0, 0.1, 0.02))
     out = datadis.month_bill(hourly, records, NOW.date(), NOW, cfg, lambda _: 0.1, TZ)
     assert out["desde"] == "2026-10-28" and out["dias"][0]["fuente"] == "contador"
-    assert out["importado_kwh"] == 24.0 and out["horas"] == {"contador": 48, "sin_solar": 0, "addon": 0}
+    assert out["importado_kwh"] == 24.0 and out["horas"] == {"contador": 48, "solar_ha": 0, "sin_solar": 0, "addon": 0}
     cmp = out["comparado"]
     assert cmp["contador"] == out["total"] and cmp["contador"] > cmp["addon"] and cmp["dif"] > 0
     assert sum(p["kwh"] for p in out["periodos"]) == pytest.approx(24.0)
     # Sin datos del contador en el mes no hay factura de Datadis.
     assert datadis.month_bill({}, records, NOW.date(), NOW, cfg, lambda _: 0.1, TZ) is None
+
+
+def test_fetch_generation_drops_days_without_any_generation():
+    rec = asyncio.run(datadis.fetch(FakeHA(), NOW, TZ, generation_id="sensor.fv"))
+    assert list(rec.generation.values()) == [0.8]

@@ -7,7 +7,8 @@ que mide el addon (hogar + cargador). Datadis publica los datos con 1–2 días 
 
 También calcula la factura con el consumo del contador: en cada hora se toma el consumo de
 Datadis y la generación asignada que mide el addon (Datadis no trae el reparto del autoconsumo
-compartido). Las horas que Datadis aún no ha publicado se completan con los sensores del addon.
+compartido). Las horas anteriores al addon toman la generación de las estadísticas de HA del
+sensor de energía generada, y las que Datadis aún no ha publicado se completan con el addon.
 """
 from __future__ import annotations
 
@@ -27,6 +28,7 @@ SHOWN_DAYS = 30
 # Un día se compara solo si el addon tiene casi todas sus horas.
 MIN_HOURS_PER_DAY = 22
 PERIOD_NAMES = ("Punta", "Llano", "Valle")
+MIN_GENERATION_PER_DAY = 0.1  # kWh
 
 
 def find_consumption_statistic(statistic_ids: list[str]) -> str | None:
@@ -49,6 +51,7 @@ class Reconciliation:
     updated: str | None = None
     error: str | None = None
     hourly: dict[int, float] = field(default_factory=dict)  # inicio de la hora (epoch s) → kWh
+    generation: dict[int, float] = field(default_factory=dict)  # generación según las estadísticas de HA
     maximeter: list[dict] = field(default_factory=list)
 
     def compare(self, records: list[HourRecord], now: datetime, tz: ZoneInfo) -> tuple[float | None, dict]:
@@ -89,12 +92,14 @@ class Reconciliation:
 
 def merge_hours(hourly: dict[int, float], records: list[HourRecord], start: datetime, end: datetime,
                 price_at: Callable[[datetime], float], compensation: float, tz: ZoneInfo,
-                ) -> tuple[list[HourRecord], dict[int, str]]:
+                generation: dict[int, float] | None = None) -> tuple[list[HourRecord], dict[int, str]]:
     """Registros horarios de [start, end) con el consumo del contador y la solar del addon.
 
-    Fuente de cada hora: «contador» (Datadis + solar del addon), «sin_solar» (solo Datadis: la
-    generación se toma como 0) o «addon» (Datadis aún no la ha publicado).
+    Fuente de cada hora: «contador» (Datadis + solar del addon), «solar_ha» (Datadis + generación
+    de las estadísticas de HA), «sin_solar» (solo Datadis: la generación se toma como 0) o
+    «addon» (Datadis aún no la ha publicado).
     """
+    generation = generation or {}
     addon = {int(r.start.timestamp()): r for r in records if start <= r.start < end}
     lo, hi = start.timestamp(), end.timestamp()
     out, source = [], {}
@@ -105,8 +110,9 @@ def merge_hours(hourly: dict[int, float], records: list[HourRecord], start: date
             source[ts] = "addon"
         elif a is None:
             when = datetime.fromtimestamp(ts, tz)
-            out.append(HourRecord(when.isoformat(), 0.0, meter, 0.0, price_at(when), compensation))
-            source[ts] = "sin_solar"
+            gen = generation.get(ts)
+            out.append(HourRecord(when.isoformat(), gen or 0.0, meter, 0.0, price_at(when), compensation))
+            source[ts] = "sin_solar" if gen is None else "solar_ha"
         else:
             # El contador manda en el total; el coche conserva lo que midió el cargador.
             ev = min(a.ev, meter)
@@ -123,11 +129,13 @@ def _period_names(prices: list[float]) -> dict[float, str]:
 
 
 def month_bill(hourly: dict[int, float], records: list[HourRecord], month: date, now: datetime, cfg: Config,
-               price_at: Callable[[datetime], float], tz: ZoneInfo, daily: bool = True) -> dict | None:
+               price_at: Callable[[datetime], float], tz: ZoneInfo, daily: bool = True,
+               generation: dict[int, float] | None = None) -> dict | None:
     """Factura del mes natural `month` con el consumo del contador (hasta `now`)."""
     start = datetime(month.year, month.month, 1, tzinfo=tz)
     end = datetime(month.year + month.month // 12, month.month % 12 + 1, 1, tzinfo=tz)
-    recs, source = merge_hours(hourly, records, start, min(end, now), price_at, cfg.compensation_price, tz)
+    recs, source = merge_hours(hourly, records, start, min(end, now), price_at, cfg.compensation_price, tz,
+                               generation)
     if not any(s != "addon" for s in source.values()):
         return None
     first, last = recs[0].start.date(), recs[-1].start.date()
@@ -143,7 +151,7 @@ def month_bill(hourly: dict[int, float], records: list[HourRecord], month: date,
         addon = compute_bill(addon_recs, a_days, cfg).total
         compared = {"desde": addon_recs[0].start.date().isoformat(), "contador": round(meter, 2),
                     "addon": round(addon, 2), "dif": round(meter - addon, 2)}
-    counts = {k: sum(1 for s in source.values() if s == k) for k in ("contador", "sin_solar", "addon")}
+    counts = {k: sum(1 for s in source.values() if s == k) for k in ("contador", "solar_ha", "sin_solar", "addon")}
     meter_hours = [ts for ts, s in source.items() if s != "addon"]
 
     names = _period_names([p.price for p in cfg.tariff_periods] or [r.price for r in recs])
@@ -177,7 +185,7 @@ def month_bill(hourly: dict[int, float], records: list[HourRecord], month: date,
                          "addon": round(compute_bill(addon_day[day], 1, cfg).total, 2) if addon_day[day] else None,
                          "consumo": round(sum(r.consumption for r in by_day[day]), 2),
                          "importado": round(sum(r.grid_import for r in by_day[day]), 2),
-                         "fuente": "contador" if kinds == {"contador"} else "addon" if kinds == {"addon"} else "mixta"})
+                         "fuente": next(iter(kinds)) if len(kinds) == 1 else "mixta"})
         result["dias"] = rows
     return result
 
@@ -188,8 +196,9 @@ def _ms_to_dt(value, tz: ZoneInfo) -> datetime:
     return datetime.fromisoformat(str(value)).astimezone(tz)
 
 
-async def fetch(ha, now: datetime, tz: ZoneInfo, statistic_id: str = "") -> Reconciliation:
-    """Lee de las estadísticas de HA el consumo horario y el maxímetro mensual de e-data."""
+async def fetch(ha, now: datetime, tz: ZoneInfo, statistic_id: str = "", generation_id: str = "") -> Reconciliation:
+    """Lee de las estadísticas de HA el consumo horario y el maxímetro mensual de e-data, y la
+    generación horaria del sensor de energía generada (`generation_id`)."""
     rec = Reconciliation(updated=now.isoformat(timespec="seconds"))
     if not statistic_id:
         listing = await ha.ws_command({"type": "recorder/list_statistic_ids", "statistic_type": "sum"})
@@ -206,6 +215,18 @@ async def fetch(ha, now: datetime, tz: ZoneInfo, statistic_id: str = "") -> Reco
     for row in (hourly or {}).get(statistic_id, []):
         if row.get("change") is not None:
             rec.hourly[int(_ms_to_dt(row["start"], tz).timestamp())] = max(0.0, float(row["change"]))
+    if generation_id:
+        gen = await ha.ws_command({"type": "recorder/statistics_during_period", "start_time": start.isoformat(),
+                                   "statistic_ids": [generation_id], "period": "hour", "types": ["change"]})
+        for row in (gen or {}).get(generation_id, []):
+            if row.get("change") is not None:
+                rec.generation[int(_ms_to_dt(row["start"], tz).timestamp())] = max(0.0, float(row["change"]))
+        # Un día entero sin generación es un corte del sensor, no un día sin sol: se descarta.
+        per_day: dict[date, float] = defaultdict(float)
+        for ts, kwh in rec.generation.items():
+            per_day[datetime.fromtimestamp(ts, tz).date()] += kwh
+        rec.generation = {ts: kwh for ts, kwh in rec.generation.items()
+                          if per_day[datetime.fromtimestamp(ts, tz).date()] >= MIN_GENERATION_PER_DAY}
 
     ids = maximeter_ids(statistic_id)
     year_ago = (now - timedelta(days=365)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)

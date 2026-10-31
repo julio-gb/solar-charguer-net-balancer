@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.1
+- «Factura con Datadis»: las horas anteriores al addon toman la generación de las estadísticas
+  de HA del sensor de energía generada. Los días con generación 0 (corte del sensor) se marcan
+  como sin dato de solar.
+
 ## 0.9.0
 - Factura con el contador: nuevo sensor «Factura con Datadis» que calcula la factura del mes en
   curso y del anterior con el consumo horario de Datadis y la solar asignada que mide el addon.
