@@ -112,6 +112,8 @@ ENTITIES: list[Entity] = [
     _sensor("surplus_discount", "Descuento excedentes", "EUR", "monetary", None, "mdi:cash-refund", 2, attrs=True),
     # Conciliación con la distribuidora: diferencia % addon − Datadis (últimos 30 días).
     _sensor("datadis_check", "Diferencia con Datadis", "%", None, "measurement", "mdi:scale-unbalanced", 1, attrs=True),
+    # Factura del mes con el consumo del contador (Datadis) y la solar asignada que mide el addon.
+    _sensor("datadis_bill", "Factura con Datadis", "EUR", "monetary", None, "mdi:receipt-text-check", 2, attrs=True),
     _sensor("current_price", "Precio actual", "EUR/kWh", None, None, "mdi:cash", 3),
     _sensor("forced_status", "Carga forzada estado", icon="mdi:calendar-clock"),
     _sensor("last_event", "Último evento", icon="mdi:text-box-outline", attrs=True),
@@ -160,7 +162,7 @@ class MqttBridge:
 
     def _device(self) -> dict:
         return {"identifiers": [PREFIX], "name": DEVICE_NAME, "manufacturer": "Solar Charger Net Balancer",
-                "model": "Addon Home Assistant", "sw_version": "0.8.2"}
+                "model": "Addon Home Assistant", "sw_version": "0.9.0"}
 
     def _discovery(self, entity: Entity) -> dict:
         payload: dict[str, Any] = {

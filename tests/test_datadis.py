@@ -71,3 +71,34 @@ def test_fetch_without_edata_reports_error():
             return []
     rec = asyncio.run(datadis.fetch(Empty(), NOW, TZ))
     assert rec.error and rec.hourly == {}
+
+
+def test_merge_hours_uses_meter_and_addon_solar():
+    h = _hours(28, 3)
+    hourly = {int(h[0].timestamp()): 1.0, int(h[1].timestamp()): 0.6}
+    records = [HourRecord(h[0].isoformat(), 0.5, 0.6, 0.3, 0.2, 0.02),   # contador 1,0 frente a 0,9 del addon
+               HourRecord(h[2].isoformat(), 0.0, 0.4, 0.0, 0.1, 0.02)]   # Datadis aún sin publicar
+    recs, source = datadis.merge_hours(hourly, records, h[0], h[2] + timedelta(hours=1), lambda _: 0.15, 0.02, TZ)
+    assert [source[int(x.timestamp())] for x in h] == ["contador", "sin_solar", "addon"]
+    assert recs[0].consumption == pytest.approx(1.0) and recs[0].ev == 0.3 and recs[0].gen == 0.5
+    assert recs[0].grid_import == pytest.approx(0.5)
+    assert recs[1].gen == 0 and recs[1].home == 0.6 and recs[1].price == 0.15
+    assert recs[2] is records[1]
+
+
+def test_month_bill_with_meter_data():
+    from helpers import make_config
+    cfg = make_config()
+    hourly, records = {}, []
+    for day in (28, 29):
+        for h in _hours(day):
+            hourly[int(h.timestamp())] = 0.5
+            records.append(HourRecord(h.isoformat(), 0, 0.4, 0.0, 0.1, 0.02))
+    out = datadis.month_bill(hourly, records, NOW.date(), NOW, cfg, lambda _: 0.1, TZ)
+    assert out["desde"] == "2026-10-28" and out["dias"][0]["fuente"] == "contador"
+    assert out["importado_kwh"] == 24.0 and out["horas"] == {"contador": 48, "sin_solar": 0, "addon": 0}
+    cmp = out["comparado"]
+    assert cmp["contador"] == out["total"] and cmp["contador"] > cmp["addon"] and cmp["dif"] > 0
+    assert sum(p["kwh"] for p in out["periodos"]) == pytest.approx(24.0)
+    # Sin datos del contador en el mes no hay factura de Datadis.
+    assert datadis.month_bill({}, records, NOW.date(), NOW, cfg, lambda _: 0.1, TZ) is None

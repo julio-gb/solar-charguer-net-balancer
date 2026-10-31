@@ -21,7 +21,7 @@ from .storage import save_state
 from .tariff import Tariff
 
 _LOGGER = logging.getLogger(__name__)
-VERSION = "0.8.2"
+VERSION = "0.9.0"
 KEEP_DAYS = 400
 TRACE_LEN = 2500
 # Una potencia doméstica mayor que esto es una lectura errónea del sensor (p. ej. el Beny
@@ -312,6 +312,7 @@ class Balancer:
         if self.prev and now >= self.hour + timedelta(minutes=self.cfg.hour_close_delay_minutes):
             self._close_hour(self.prev["hour"], self.prev["acc"])
             self.prev = None
+            self._publish_datadis(now)
 
         if is_available(soc):
             stamp = soc.get("last_updated") or soc.get("last_changed")
@@ -604,6 +605,15 @@ class Balancer:
         pct, attrs = self.datadis.compare(closed, now, self.tz)
         attrs["potencia_contratada"] = {"p1": self.cfg.contracted_power_p1_kw, "p2": self.cfg.contracted_power_p2_kw}
         self.pub.publish_state("datadis_check", pct, attrs)
+
+        # Factura con el consumo del contador: mes en curso (con detalle por día) y mes anterior.
+        price_at = lambda when: self.tariff.price_at(when) or 0.0  # noqa: E731
+        prev_month = (now.replace(day=1) - timedelta(days=1)).date()
+        current = datadis.month_bill(self.datadis.hourly, closed, now.date(), now, self.cfg, price_at, self.tz)
+        previous = datadis.month_bill(self.datadis.hourly, closed, prev_month, now, self.cfg, price_at, self.tz,
+                                      daily=False)
+        self.pub.publish_state("datadis_bill", current["total"] if current else None,
+                               {"actual": current, "anterior": previous, "error": self.datadis.error})
 
     async def run(self, stop: asyncio.Event) -> None:
         save_every = max(1, 300 // self.cfg.poll_interval_seconds)

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.0
+- Factura con el contador: nuevo sensor «Factura con Datadis» que calcula la factura del mes en
+  curso y del anterior con el consumo horario de Datadis y la solar asignada que mide el addon.
+  Las horas que Datadis aún no ha publicado se completan con el addon. Incluye desglose,
+  energía por periodo, coste por día y la comparación con el addon en las mismas horas.
+- Dashboard: sección «Factura con el contador» en Estadísticas con ventana de detalle.
+
 ## 0.8.2
 - Se descartan las lecturas de potencia imposibles (más de 30 kW). El Beny reportó 409,6 kW
   unos segundos con el coche parado y se contabilizó como 1,1 kWh cargados.

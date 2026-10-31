@@ -1,4 +1,4 @@
-# Dashboard «Carga solar» del addon Solar Charger Balancer (v1.3, requiere addon ≥ 0.8.1).
+# Dashboard «Carga solar» del addon Solar Charger Balancer (v1.4, requiere addon ≥ 0.9.0).
 # Tarjetas de HACS que usa: Mushroom, ApexCharts Card, mini-graph-card,
 # Multiple Entity Row, auto-entities, Bubble Card (ventanas emergentes) y Energy Custom Graph Card.
 # Pestañas: «Hoy» (datos en vivo y del día en curso), «Estadísticas» (más de un día) y
@@ -768,6 +768,54 @@ views:
                   return (entity.attributes.prevision || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.acum]);
                 show: { legend_value: false }
 
+      # ================================================================== FACTURA CON DATADIS
+      # Datos del sensor «Factura con Datadis»: misma fórmula que la factura del addon, pero con el
+      # consumo horario del contador (Datadis) y la solar asignada que mide el addon. Las horas que
+      # Datadis aún no ha publicado (1–2 días) se completan con los sensores del addon.
+      - type: grid
+        cards:
+          - type: heading
+            heading: Factura con el contador
+            icon: mdi:receipt-text-check
+          - type: custom:mushroom-template-card
+            entity: sensor.solar_charger_factura_con_datadis
+            primary: >-
+              {%- set v = states(entity) %}
+              {%- if is_number(v) %}Con Datadis: {{ '%.2f' | format(v | float) | replace('.', ',') }} €
+              {%- else %}Sin datos de Datadis este mes{% endif %}
+            secondary: >-
+              {%- set a = state_attr(entity, 'actual') or {} %}
+              {%- set c = a.get('comparado') or {} %}
+              {%- set u = a.get('datadis_hasta') or '' %}
+              {%- if c %}Addon {{ '%.2f' | format(c.addon | float(0)) | replace('.', ',') }} € en las mismas horas ({{ '%+.2f' | format(c.dif | float(0)) | replace('.', ',') }} €) · {% endif %}
+              {%- if u | length >= 10 %}contador hasta el {{ u[8:10] | int }}/{{ u[5:7] | int }} · {% endif %}toca para el detalle
+            multiline_secondary: true
+            icon: mdi:receipt-text-check
+            color: teal
+            tap_action: { action: navigate, navigation_path: "#factura-datadis" }
+            grid_options: { columns: full }
+          - type: markdown
+            grid_options: { columns: full }
+            content: |
+              {% set s = 'sensor.solar_charger_factura_con_datadis' %}
+              {% macro e(v) %}{{ '%.2f' | format(v | float(0)) | replace('.', ',') }} €{% endmacro %}
+              {% macro f(d) %}{{ d[8:10] | int }}/{{ d[5:7] | int }}{% endmacro %}
+              {% set a = state_attr(s, 'actual') or {} %}
+              {% set p = state_attr(s, 'anterior') or {} %}
+
+              | | Este mes | Mes anterior |
+              |:--|--:|--:|
+              | **Total** | **{{ e(a.get('total')) if a else '—' }}** | **{{ e(p.get('total')) if p else '—' }}** |
+              | Días | {{ (f(a.desde) ~ '–' ~ f(a.hasta)) if a else '—' }} | {{ (f(p.desde) ~ '–' ~ f(p.hasta)) if p else '—' }} |
+              | Importado | {{ ('%.1f' | format(a.importado_kwh) | replace('.', ',') ~ ' kWh') if a else '—' }} | {{ ('%.1f' | format(p.importado_kwh) | replace('.', ',') ~ ' kWh') if p else '—' }} |
+              | Vertido | {{ ('%.1f' | format(a.vertido_kwh) | replace('.', ',') ~ ' kWh') if a else '—' }} | {{ ('%.1f' | format(p.vertido_kwh) | replace('.', ',') ~ ' kWh') if p else '—' }} |
+
+              {%- set sin = (a.get('horas') or {}).get('sin_solar', 0) + (p.get('horas') or {}).get('sin_solar', 0) %}
+              {%- if sin > 0 %}
+
+              _⚠️ {{ sin }} horas sin registro de solar del addon: se calculan sin sol y su coste sale por encima del real._
+              {%- endif %}
+
       # ================================================================== IMPORTADO DE LA RED (30 DÍAS)
       # Solo la energía que se ha comprado a la red, separada entre coche y hogar, en kWh y en €.
       # Reparto de cada hora: el sol cubre primero el hogar; lo que falta se compra a la red.
@@ -950,6 +998,92 @@ views:
                   {%- else -%}
                   La previsión aparecerá cuando haya al menos un día completo registrado.
                   {%- endif %}
+
+          # Detalle de la factura con el consumo del contador: se abre al tocar «Con Datadis».
+          - type: custom:bubble-card
+            card_type: pop-up
+            hash: "#factura-datadis"
+            name: Factura con el contador
+            icon: mdi:receipt-text-check
+            cards:
+              - type: markdown
+                content: |
+                  {% set s = 'sensor.solar_charger_factura_con_datadis' %}
+                  {% macro e(v) %}{{ '%.2f' | format(v | float(0)) | replace('.', ',') }} €{% endmacro %}
+                  {% macro k(v) %}{{ '%.1f' | format(v | float(0)) | replace('.', ',') }} kWh{% endmacro %}
+                  {% macro f(d) %}{{ d[8:10] | int }}/{{ d[5:7] | int }}{% endmacro %}
+                  {% set a = state_attr(s, 'actual') or {} %}
+                  {% set p = state_attr(s, 'anterior') or {} %}
+                  {% if not a and not p -%}
+                  {{ state_attr(s, 'error') or 'Aún no hay datos de Datadis.' }}
+                  {%- else -%}
+                  | Concepto | Este mes | Mes anterior |
+                  |:--|--:|--:|
+                  {%- for key, name in [('potencia', 'Potencia'), ('energia', 'Energía'), ('compensacion', 'Excedentes'), ('bono_social_y_alquiler', 'Bono social y contador'), ('impuesto_electrico', 'Impuesto eléctrico'), ('iva', 'IVA'), ('solar_wallet', 'Solar Wallet')] %}
+                  {%- if key != 'solar_wallet' or (a.get(key, 0) | float(0)) < 0 or (p.get(key, 0) | float(0)) < 0 %}
+                  | {{ name }} | {{ e(a.get(key)) if a else '—' }} | {{ e(p.get(key)) if p else '—' }} |
+                  {%- endif %}
+                  {%- endfor %}
+                  | **Total** | **{{ e(a.get('total')) if a else '—' }}** | **{{ e(p.get('total')) if p else '—' }}** |
+                  | Días facturados | {{ a.get('dias', '—') if a else '—' }} | {{ p.get('dias', '—') if p else '—' }} |
+
+                  **Energía comprada por periodo**
+
+                  | Periodo | Este mes | € | Mes anterior | € |
+                  |:--|--:|--:|--:|--:|
+                  {%- set names = ((a.get('periodos') or []) + (p.get('periodos') or [])) | map(attribute='periodo') | unique | list %}
+                  {%- for n in names %}
+                  {%- set x = (a.get('periodos') or []) | selectattr('periodo', 'eq', n) | first | default({}) %}
+                  {%- set y = (p.get('periodos') or []) | selectattr('periodo', 'eq', n) | first | default({}) %}
+                  | {{ n }} | {{ k(x.kwh) if x else '—' }} | {{ e(x.eur) if x else '—' }} | {{ k(y.kwh) if y else '—' }} | {{ e(y.eur) if y else '—' }} |
+                  {%- endfor %}
+
+                  _€ de energía sin impuestos, al precio de cada periodo._
+
+                  {%- for label, m in [('Este mes', a), ('Mes anterior', p)] if m %}
+                  {%- set h = m.get('horas') or {} %}
+
+                  **{{ label }}** ({{ f(m.desde) }}–{{ f(m.hasta) }}): {{ h.get('contador', 0) }} h con contador y solar,
+                  {{ h.get('addon', 0) }} h solo addon (Datadis aún no las publica){% if h.get('sin_solar', 0) %},
+                  {{ h.get('sin_solar') }} h sin solar registrada (calculadas sin sol){% endif %}.
+                  {%- set c = m.get('comparado') %}
+                  {%- if c %} Desde el {{ f(c.desde) }}, en las mismas horas: contador {{ e(c.contador) }} · addon {{ e(c.addon) }} ({{ '%+.2f' | format(c.dif | float(0)) | replace('.', ',') }} €).{% endif %}
+                  {%- endfor %}
+                  {%- endif %}
+              - type: custom:apexcharts-card
+                graph_span: 31d
+                span: { start: month }
+                header:
+                  show: true
+                  title: Coste de cada día (€) · contador frente a addon
+                apex_config:
+                  plotOptions: { bar: { columnWidth: "80%", borderRadius: 2 } }
+                  legend: { show: true, position: top }
+                  dataLabels: { enabled: false }
+                  xaxis: { labels: { format: "dd" } }
+                  tooltip: { shared: true, intersect: false, x: { format: "ddd dd/MM" } }
+                yaxis:
+                  - min: 0
+                    decimals: 1
+                series:
+                  - entity: sensor.solar_charger_factura_con_datadis
+                    name: Contador
+                    type: column
+                    color: "#2BA89A"
+                    unit: €
+                    float_precision: 2
+                    data_generator: |
+                      return ((entity.attributes.actual || {}).dias || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.total]);
+                    show: { legend_value: false }
+                  - entity: sensor.solar_charger_factura_con_datadis
+                    name: Addon
+                    type: column
+                    color: "#4A90D9"
+                    unit: €
+                    float_precision: 2
+                    data_generator: |
+                      return ((entity.attributes.actual || {}).dias || []).filter(d => d.addon !== null).map(d => [new Date(d.d + "T12:00:00").getTime(), d.addon]);
+                    show: { legend_value: false }
 
   - title: Datadis
     path: datadis
