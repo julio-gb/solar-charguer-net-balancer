@@ -240,47 +240,64 @@ views:
             grid_options: { columns: full, rows: 5 }
             graph_span: 31d
             span: { start: month }
-            stacked: true
             header:
               show: true
-              title: Coste por día (€)
+              title: Coste de cada día con impuestos (€)
             apex_config:
-              plotOptions: { bar: { columnWidth: "80%", borderRadius: 2 } }
+              plotOptions: { bar: { columnWidth: "70%", borderRadius: 3 } }
               legend: { show: true, position: top }
               dataLabels: { enabled: false }
               xaxis: { labels: { format: "dd" } }
-              tooltip: { x: { format: "dd/MM" } }
+              tooltip: { shared: true, intersect: false, x: { format: "ddd dd/MM" } }
             yaxis:
-              - decimals: 1
-                apex_config: { tickAmount: 4 }
+              - min: 0
+                max: "|+15%|"
+                decimals: 1
             series:
               # Datos del sensor «Previsión factura mes» (atributo dias: un elemento por día del mes).
+              # Barra: lo que suma el día a la factura. Líneas: la parte fija (se paga aunque no
+              # consumas) y la media de los días ya cerrados, para ver qué días se salen.
               - entity: sensor.solar_charger_prevision_factura_mes
-                name: Fijo
+                name: Coste del día
                 type: column
-                stack_group: coste
-                color: "#8A94A6"
-                float_precision: 2
-                data_generator: |
-                  return (entity.attributes.dias || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.fijo]);
-                show: { legend_value: false }
-              - entity: sensor.solar_charger_prevision_factura_mes
-                name: Energía
-                type: column
-                stack_group: coste
                 color: "#4A90D9"
+                unit: €
                 float_precision: 2
                 data_generator: |
-                  return (entity.attributes.dias || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.energia]);
+                  return (entity.attributes.dias || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.total]);
                 show: { legend_value: false }
               - entity: sensor.solar_charger_prevision_factura_mes
-                name: Impuestos
-                type: column
-                stack_group: coste
-                color: "#E0A030"
+                name: Parte fija
+                type: line
+                color: "#8A94A6"
+                stroke_width: 2
+                stroke_dash: 4
+                unit: €
                 float_precision: 2
                 data_generator: |
-                  return (entity.attributes.dias || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.impuestos]);
+                  // Potencia + bono social + contador, con los impuestos que les corresponden.
+                  return (entity.attributes.dias || []).map(d => {
+                    const base = d.fijo + d.energia;
+                    const k = base > 0 ? d.total / base : 1;
+                    return [new Date(d.d + "T12:00:00").getTime(), d.fijo * k];
+                  });
+                show: { legend_value: false }
+              - entity: sensor.solar_charger_prevision_factura_mes
+                name: Media del mes
+                type: line
+                color: "#E0A030"
+                stroke_width: 2
+                unit: €
+                float_precision: 2
+                data_generator: |
+                  // Media de los días cerrados (sin hoy, que va a medias), dibujada en todo el mes.
+                  const dias = entity.attributes.dias || [];
+                  const n = new Date();
+                  const hoy = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+                  const cerrados = dias.filter(d => d.d < hoy);
+                  if (!cerrados.length) return [];
+                  const media = cerrados.reduce((s, d) => s + d.total, 0) / cerrados.length;
+                  return dias.map(d => [new Date(d.d + "T12:00:00").getTime(), media]);
                 show: { legend_value: false }
           - type: custom:apexcharts-card
             section_mode: true
