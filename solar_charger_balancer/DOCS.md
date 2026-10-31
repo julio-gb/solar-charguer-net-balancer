@@ -85,6 +85,14 @@ Sensores con impuestos incluidos, calculados con el balance neto de cada hora:
 Los importes fijos (potencia, bono social, alquiler, impuestos) se configuran en la sección
 **Factura** de Ajustes. Es una estimación: la factura real usa las lecturas del contador.
 
+## Cuadre con Datadis
+Si tienes la integración **e-data** (Datadis), el addon lee cada 3 horas sus estadísticas de
+consumo horario y maxímetro y publica **Diferencia con Datadis**: (addon − contador) ÷ contador
+en los últimos 30 días, solo con las horas que tienen ambos datos y días con ≥ 22 horas del addon.
+El atributo `dias` trae el detalle diario y `maximetro` la potencia máxima de cada mes.
+e-data no recibe el autoconsumo ni los excedentes de una instalación compartida: se cuadra el
+consumo bruto (hogar + coche).
+
 ## Diagnóstico
 En la página de configuración, **Descargar diagnóstico** genera un JSON con la configuración,
 las horas cerradas de los últimos 14 días, los eventos y la traza de cada decisión (lecturas,

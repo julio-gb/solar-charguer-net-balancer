@@ -93,3 +93,9 @@ def test_stats_view_select_discovery():
     assert view.entity_id == "select.solar_charger_vista_estadisticas"
     assert payload["options"] == ["General", "Coche", "Hogar"] and "command_topic" in payload
     loop.close()
+
+
+def test_dashboard_has_no_unquoted_y_keys():
+    # El editor de HA lee la clave «y» sin comillas como booleano (YAML 1.1) y rompe las anotaciones.
+    text = (ROOT / "dashboards" / "solar_charger.yaml").read_text(encoding="utf-8")
+    assert not re.findall(r"^\s*-?\s*y:", text, re.M)

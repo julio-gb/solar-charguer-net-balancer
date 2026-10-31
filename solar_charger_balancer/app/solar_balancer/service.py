@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 from .billing import compensation_effect, compute_bill, month_forecast, solar_value
 from .charger import Charger, ChargerEntities, ChargerReadings
 from .config import Config
+from . import datadis
 from .controller import ControlInputs, ControlParams, decide, minutes_left_in_hour
 from .energy import CounterTracker, HourRecord, compute_stats, coverage, daily_history, month_split
 from .forced import ForcedCharge, ScheduleError, parse_start
@@ -19,7 +20,7 @@ from .storage import save_state
 from .tariff import Tariff
 
 _LOGGER = logging.getLogger(__name__)
-VERSION = "0.7.0"
+VERSION = "0.8.0"
 KEEP_DAYS = 400
 TRACE_LEN = 2500
 NOTIFICATION_ID = "solar_charger_balancer_offline"
@@ -80,6 +81,8 @@ class Balancer:
         self.forced_inputs = {"start": "00:00", "hours": 4.0, "current": config.max_current}
         self.forced_message = "Sin carga programada"
         self.stats_view = "General"
+        self.datadis = datadis.Reconciliation()
+        self.datadis_due: datetime | None = None
         self.soc = SocEstimator(config.car_battery_kwh, config.charging_efficiency)
         self.last_switch: datetime | None = None
         self.last_decision_at: datetime | None = None
@@ -541,6 +544,28 @@ class Balancer:
         total = fc.pop("total")
         p("bill_forecast", None if total is None else round(total, 2), fc)
 
+    async def _refresh_datadis(self) -> None:
+        """Relee los datos de Datadis (e-data) cada 3 horas; nunca detiene el control."""
+        now = self.now()
+        if self.datadis_due and now < self.datadis_due:
+            return
+        self.datadis_due = now + timedelta(hours=3)
+        try:
+            self.datadis = await asyncio.wait_for(datadis.fetch(self.ha, now, self.tz), 60)
+        except (HAError, TimeoutError) as err:
+            self.datadis.error = str(err)
+            self.datadis_due = now + timedelta(minutes=30)
+            _LOGGER.warning("No se pudieron leer los datos de Datadis: %s", err)
+        self._publish_datadis(now)
+
+    def _publish_datadis(self, now: datetime) -> None:
+        if not self.pub:
+            return
+        closed = self.records + ([self._record(self.prev["hour"], self.prev["acc"])] if self.prev else [])
+        pct, attrs = self.datadis.compare(closed, now, self.tz)
+        attrs["potencia_contratada"] = {"p1": self.cfg.contracted_power_p1_kw, "p2": self.cfg.contracted_power_p2_kw}
+        self.pub.publish_state("datadis_check", pct, attrs)
+
     async def run(self, stop: asyncio.Event) -> None:
         save_every = max(1, 300 // self.cfg.poll_interval_seconds)
         tick = 0
@@ -552,6 +577,7 @@ class Balancer:
             except Exception:  # noqa: BLE001 - el addon no debe detenerse por un ciclo fallido
                 _LOGGER.exception("Error en el ciclo de control")
             tick += 1
+            await self._refresh_datadis()
             if commanded or tick % save_every == 0:
                 try:
                     save_state(self.snapshot())

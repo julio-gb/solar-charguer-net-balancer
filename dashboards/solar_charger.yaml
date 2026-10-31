@@ -1,7 +1,8 @@
-# Dashboard «Carga solar» del addon Solar Charger Balancer (v1.1, requiere addon ≥ 0.7.0).
+# Dashboard «Carga solar» del addon Solar Charger Balancer (v1.2, requiere addon ≥ 0.8.0).
 # Tarjetas de HACS que usa: Mushroom, ApexCharts Card, mini-graph-card,
 # Multiple Entity Row, auto-entities, Bubble Card (ventanas emergentes) y Energy Custom Graph Card.
-# Pestañas: «Hoy» (datos en vivo y del día en curso) y «Estadísticas» (más de un día).
+# Pestañas: «Hoy» (datos en vivo y del día en curso), «Estadísticas» (más de un día) y
+# «Datadis» (cuadre con los datos de la distribuidora, vía la integración e-data).
 # Uso: abrir el panel → ✏️ → ⋮ → Editor de configuración en bruto → pegar todo → Guardar.
 title: Carga solar
 views:
@@ -476,7 +477,8 @@ views:
                 tooltip: { x: { format: "ddd dd/MM" } }
                 annotations:
                   yaxis:
-                    - y: 60
+                    # «y» entre comillas: el editor de HA lee «y» sin comillas como true (YAML 1.1).
+                    - "y": 60
                       borderColor: "#4CAF6A"
                       strokeDashArray: 4
               yaxis:
@@ -840,3 +842,194 @@ views:
                   {%- else -%}
                   La previsión aparecerá cuando haya al menos un día completo registrado.
                   {%- endif %}
+
+  - title: Datadis
+    path: datadis
+    icon: mdi:transmission-tower-import
+    type: sections
+    max_columns: 3
+    sections:
+      # ================================================================== CUADRE CON EL CONTADOR
+      # Datos del sensor «Diferencia con Datadis» del addon, que lee las estadísticas de e-data.
+      # Compara, hora a hora, el consumo del contador (hogar + coche, antes del reparto del
+      # autoconsumo compartido) con lo que suman los sensores del hogar y del cargador.
+      - type: grid
+        column_span: 2
+        cards:
+          - type: heading
+            heading: Cuadre con el contador
+            icon: mdi:scale-balance
+          - type: custom:mushroom-template-card
+            entity: sensor.solar_charger_diferencia_con_datadis
+            primary: >-
+              {%- set v = states(entity) %}
+              {%- if is_number(v) %}Diferencia con Datadis: {{ '%+.1f' | format(v | float) | replace('.', ',') }} %
+              {%- else %}Sin datos de Datadis para comparar{% endif %}
+            secondary: >-
+              {%- set p = state_attr(entity, 'periodo') or {} %}
+              {%- set u = state_attr(entity, 'ultimo_dato') or '' %}
+              {%- set err = state_attr(entity, 'error') %}
+              {%- if err %}{{ err }}{% else %}
+              {{ p.get('dias', 0) }} días: contador {{ '%.1f' | format(p.get('datadis', 0) | float(0)) | replace('.', ',') }} kWh ·
+              addon {{ '%.1f' | format(p.get('addon', 0) | float(0)) | replace('.', ',') }} kWh
+              {%- if u | length >= 10 %} · Datadis hasta el {{ u[8:10] | int }}/{{ u[5:7] | int }}{% endif %}
+              {%- endif %}
+            multiline_secondary: true
+            icon: mdi:scale-unbalanced
+            color: >-
+              {%- set v = states(entity) | float(99) | abs %}
+              {{ 'green' if v <= 5 else 'orange' if v <= 10 else 'red' }}
+            grid_options: { columns: full }
+          - type: custom:apexcharts-card
+            section_mode: true
+            grid_options: { columns: full, rows: 5 }
+            graph_span: 30d
+            span: { end: day }
+            header:
+              show: true
+              title: Consumo por día (kWh) · contador frente a addon
+            apex_config:
+              plotOptions: { bar: { columnWidth: "80%", borderRadius: 2 } }
+              legend: { show: true, position: top }
+              dataLabels: { enabled: false }
+              xaxis: { labels: { format: "dd/MM" } }
+              tooltip: { shared: true, intersect: false, x: { format: "ddd dd/MM" } }
+            yaxis:
+              - min: 0
+                decimals: 0
+            series:
+              - entity: sensor.solar_charger_diferencia_con_datadis
+                name: Contador (Datadis)
+                type: column
+                color: "#8A94A6"
+                unit: kWh
+                float_precision: 2
+                data_generator: |
+                  return (entity.attributes.dias || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.datadis]);
+                show: { legend_value: false }
+              - entity: sensor.solar_charger_diferencia_con_datadis
+                name: Addon (hogar + coche)
+                type: column
+                color: "#4A90D9"
+                unit: kWh
+                float_precision: 2
+                data_generator: |
+                  return (entity.attributes.dias || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.addon]);
+                show: { legend_value: false }
+          - type: custom:apexcharts-card
+            section_mode: true
+            grid_options: { columns: full, rows: 4 }
+            graph_span: 30d
+            span: { end: day }
+            header:
+              show: true
+              title: Diferencia por día (%) · franja = ±5 %
+            apex_config:
+              plotOptions: { bar: { columnWidth: "70%", borderRadius: 2 } }
+              legend: { show: false }
+              dataLabels: { enabled: false }
+              xaxis: { labels: { format: "dd/MM" } }
+              tooltip: { x: { format: "ddd dd/MM" } }
+              annotations:
+                yaxis:
+                  - "y": -5
+                    y2: 5
+                    fillColor: "#4CAF6A"
+                    opacity: 0.12
+                    borderColor: transparent
+            yaxis:
+              - decimals: 0
+            series:
+              - entity: sensor.solar_charger_diferencia_con_datadis
+                name: Diferencia
+                type: column
+                color: "#E0A030"
+                unit: "%"
+                float_precision: 1
+                data_generator: |
+                  return (entity.attributes.dias || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.dif_pct]);
+                show: { legend_value: false }
+          - type: markdown
+            grid_options: { columns: full }
+            content: |
+              **Cómo leerlo.** Negativo = los sensores miden menos que el contador. Se comparan solo
+              las horas que tienen los dos datos y los días con al menos 22 horas registradas por el addon.
+              Datadis publica con 1–2 días de retraso.
+
+              _e-data no recibe de Datadis el autoconsumo ni los excedentes de la instalación compartida
+              (llegan a 0), así que aquí se cuadra el consumo; el reparto solar se comprueba con la factura._
+
+      # ================================================================== MAXÍMETRO
+      - type: grid
+        cards:
+          - type: heading
+            heading: Potencia máxima
+            icon: mdi:gauge
+          - type: custom:mushroom-template-card
+            entity: sensor.solar_charger_diferencia_con_datadis
+            primary: >-
+              {%- set m = state_attr(entity, 'maximetro') or [] %}
+              {%- set p1 = m | selectattr('p1', 'defined') | map(attribute='p1') | list %}
+              {%- set p2 = m | selectattr('p2', 'defined') | map(attribute='p2') | list %}
+              Máx. 12 meses: punta {{ ('%.2f' | format(p1 | max) | replace('.', ',')) if p1 else '—' }} kW ·
+              valle {{ ('%.2f' | format(p2 | max) | replace('.', ',')) if p2 else '—' }} kW
+            secondary: >-
+              {%- set c = state_attr(entity, 'potencia_contratada') or {} %}
+              Contratada: {{ c.get('p1', '—') }} / {{ c.get('p2', '—') }} kW · maxímetro del contador (Datadis)
+            multiline_secondary: true
+            icon: mdi:gauge
+            color: purple
+            grid_options: { columns: full }
+          - type: custom:apexcharts-card
+            section_mode: true
+            grid_options: { columns: full, rows: 5 }
+            graph_span: 365d
+            span: { end: month }
+            header:
+              show: true
+              title: Máximo de cada mes (kW)
+            apex_config:
+              plotOptions: { bar: { columnWidth: "70%", borderRadius: 2 } }
+              legend: { show: true, position: top }
+              dataLabels: { enabled: false }
+              xaxis: { labels: { format: "MMM" } }
+              tooltip: { shared: true, intersect: false, x: { format: "MMMM yyyy" } }
+            yaxis:
+              - min: 0
+                decimals: 1
+            series:
+              - entity: sensor.solar_charger_diferencia_con_datadis
+                name: Punta (P1)
+                type: column
+                color: "#D9534F"
+                unit: kW
+                float_precision: 2
+                data_generator: |
+                  return (entity.attributes.maximetro || []).filter(m => m.p1 != null)
+                    .map(m => [new Date(m.mes + "-15T12:00:00").getTime(), m.p1]);
+                show: { legend_value: false }
+              - entity: sensor.solar_charger_diferencia_con_datadis
+                name: Valle (P2)
+                type: column
+                color: "#4A90D9"
+                unit: kW
+                float_precision: 2
+                data_generator: |
+                  return (entity.attributes.maximetro || []).filter(m => m.p2 != null)
+                    .map(m => [new Date(m.mes + "-15T12:00:00").getTime(), m.p2]);
+                show: { legend_value: false }
+              - entity: sensor.solar_charger_diferencia_con_datadis
+                name: Contratada
+                type: line
+                color: "#8A94A6"
+                stroke_width: 2
+                stroke_dash: 4
+                extend_to: false
+                unit: kW
+                float_precision: 2
+                data_generator: |
+                  const c = (entity.attributes.potencia_contratada || {}).p1;
+                  const m = entity.attributes.maximetro || [];
+                  if (!c || !m.length) return [];
+                  return m.map(x => [new Date(x.mes + "-15T12:00:00").getTime(), c]);
+                show: { legend_value: false }

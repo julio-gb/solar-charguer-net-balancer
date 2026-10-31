@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.0
+- Cuadre con la distribuidora: nuevo sensor «Diferencia con Datadis» que compara, hora a hora,
+  el consumo del contador (estadísticas de la integración e-data) con el que mide el addon,
+  y el maxímetro mensual de punta y valle. Se actualiza cada 3 horas.
+- Dashboard: pestaña «Datadis» y corrección de la línea del objetivo en la cobertura diaria.
+
 ## 0.7.0
 - «Histórico diario» incluye, por día y para el mes en curso, la energía con sol y de la red
   del consumo total, del coche y del hogar.

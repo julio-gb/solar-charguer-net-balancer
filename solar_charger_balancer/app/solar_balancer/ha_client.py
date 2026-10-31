@@ -86,6 +86,29 @@ class HAClient:
         await self._request("POST", f"/services/{domain}/{service}", json=data,
                             timeout=aiohttp.ClientTimeout(total=30))
 
+    async def ws_command(self, message: dict):
+        """Un comando de la API WebSocket de HA (p. ej. estadísticas del recorder)."""
+        url = self._base[: -len("/api")] + "/websocket" if self._base.endswith("/api") else self._base + "/websocket"
+        token = self._headers["Authorization"].split(" ", 1)[1]
+        try:
+            async with self._session.ws_connect(url, heartbeat=30,
+                                                receive_timeout=60) as ws:
+                await ws.receive_json()
+                await ws.send_json({"type": "auth", "access_token": token})
+                auth = await ws.receive_json()
+                if auth.get("type") != "auth_ok":
+                    raise HAError(f"WebSocket: autenticación rechazada ({auth.get('type')})")
+                await ws.send_json({"id": 1, **message})
+                while True:
+                    reply = await ws.receive_json()
+                    if reply.get("id") == 1 and reply.get("type") == "result":
+                        break
+        except (TimeoutError, aiohttp.ClientError, TypeError, ValueError) as err:
+            raise HAError(f"WebSocket {message.get('type')}: {err or type(err).__name__}") from err
+        if not reply.get("success"):
+            raise HAError(f"WebSocket {message.get('type')}: {reply.get('error')}")
+        return reply.get("result")
+
     async def notify(self, title: str, message: str, notification_id: str) -> None:
         await self.call_service("persistent_notification", "create",
                                 {"title": title, "message": message, "notification_id": notification_id})
