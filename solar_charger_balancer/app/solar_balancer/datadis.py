@@ -186,7 +186,7 @@ def month_bill(hourly: dict[int, float], records: list[HourRecord], month: date,
                          "consumo": round(sum(r.consumption for r in by_day[day]), 2),
                          "importado": round(sum(r.grid_import for r in by_day[day]), 2),
                          "fuente": next(iter(kinds)) if len(kinds) == 1 else "mixta"})
-        result["dias"] = rows
+        result["por_dia"] = rows
     return result
 
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.2
+- «Factura con Datadis»: el detalle por día pasa al atributo `por_dia` (`dias` es el número de
+  días facturados).
+
 ## 0.9.1
 - «Factura con Datadis»: las horas anteriores al addon toman la generación de las estadísticas
   de HA del sensor de energía generada. Los días con generación 0 (corte del sensor) se marcan

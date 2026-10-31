@@ -1074,7 +1074,7 @@ views:
                     unit: €
                     float_precision: 2
                     data_generator: |
-                      return ((entity.attributes.actual || {}).dias || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.total]);
+                      return ((entity.attributes.actual || {}).por_dia || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.total]);
                     show: { legend_value: false }
                   - entity: sensor.solar_charger_factura_con_datadis
                     name: Addon
@@ -1083,7 +1083,7 @@ views:
                     unit: €
                     float_precision: 2
                     data_generator: |
-                      return ((entity.attributes.actual || {}).dias || []).filter(d => d.addon !== null).map(d => [new Date(d.d + "T12:00:00").getTime(), d.addon]);
+                      return ((entity.attributes.actual || {}).por_dia || []).filter(d => d.addon !== null).map(d => [new Date(d.d + "T12:00:00").getTime(), d.addon]);
                     show: { legend_value: false }
 
   - title: Datadis

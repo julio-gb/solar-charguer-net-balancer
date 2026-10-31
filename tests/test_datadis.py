@@ -103,7 +103,7 @@ def test_month_bill_with_meter_data():
             hourly[int(h.timestamp())] = 0.5
             records.append(HourRecord(h.isoformat(), 0, 0.4, 0.0, 0.1, 0.02))
     out = datadis.month_bill(hourly, records, NOW.date(), NOW, cfg, lambda _: 0.1, TZ)
-    assert out["desde"] == "2026-10-28" and out["dias"][0]["fuente"] == "contador"
+    assert out["desde"] == "2026-10-28" and out["por_dia"][0]["fuente"] == "contador" and out["dias"] == 2
     assert out["importado_kwh"] == 24.0 and out["horas"] == {"contador": 48, "solar_ha": 0, "sin_solar": 0, "addon": 0}
     cmp = out["comparado"]
     assert cmp["contador"] == out["total"] and cmp["contador"] > cmp["addon"] and cmp["dif"] > 0
