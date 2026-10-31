@@ -629,114 +629,6 @@ views:
                     return (entity.attributes.dias || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.hogar_red]);
                   show: { legend_value: false }
 
-      # ================================================================== IMPORTADO DE LA RED (30 DÍAS)
-      # Solo la energía que se ha comprado a la red, separada entre coche y hogar, en kWh y en €.
-      # Reparto de cada hora: el sol cubre primero el hogar; lo que falta se compra a la red.
-      # Coste: precio del tramo de esa hora con impuesto eléctrico e IVA (sin potencia ni excedentes).
-      - type: grid
-        column_span: 2
-        cards:
-          - type: heading
-            heading: Comprado a la red · 30 días
-            icon: mdi:transmission-tower-import
-          - type: markdown
-            grid_options: { columns: full }
-            content: |
-              {% set d = state_attr('sensor.solar_charger_historico_diario', 'dias') or [] %}
-              {% macro k(x) %}{{ '%.1f' | format(x) | replace('.', ',') }} kWh{% endmacro %}
-              {% macro e(x) %}{{ '%.2f' | format(x) | replace('.', ',') }} €{% endmacro %}
-              {% set ck = d | sum(attribute='coche_red') %}{% set hk = d | sum(attribute='hogar_red') %}
-              {% set ce = d | selectattr('coche_red_eur', 'defined') | sum(attribute='coche_red_eur') %}
-              {% set he = d | selectattr('hogar_red_eur', 'defined') | sum(attribute='hogar_red_eur') %}
-              {% set te = ce + he %}
-
-              | | Energía | Coste | Precio medio | Parte del coste |
-              |:--|--:|--:|--:|--:|
-              | 🚗 **Coche** | {{ k(ck) }} | **{{ e(ce) }}** | {{ ('%.3f' | format(ce / ck) | replace('.', ',')) if ck > 0 else '—' }} €/kWh | {{ ((100 * ce / te) | round(0) | int) if te > 0 else 0 }} % |
-              | 🏠 **Hogar** | {{ k(hk) }} | **{{ e(he) }}** | {{ ('%.3f' | format(he / hk) | replace('.', ',')) if hk > 0 else '—' }} €/kWh | {{ ((100 * he / te) | round(0) | int) if te > 0 else 0 }} % |
-              | **Total** | {{ k(ck + hk) }} | **{{ e(te) }}** | {{ ('%.3f' | format(te / (ck + hk)) | replace('.', ',')) if ck + hk > 0 else '—' }} €/kWh | |
-
-              _Solo energía comprada a la red, al precio de su hora y con impuestos. No incluye potencia,
-              bono social, contador ni el descuento por excedentes (están en «Factura del mes»)._
-          - type: custom:apexcharts-card
-            section_mode: true
-            grid_options: { columns: full, rows: 5 }
-            graph_span: 30d
-            span: { end: day }
-            stacked: true
-            header:
-              show: true
-              title: Coste de la energía comprada por día (€)
-            apex_config:
-              plotOptions: { bar: { columnWidth: "70%", borderRadius: 2 } }
-              legend: { show: true, position: top }
-              dataLabels: { enabled: false }
-              xaxis: { labels: { format: "dd/MM" } }
-              tooltip: { shared: true, intersect: false, x: { format: "ddd dd/MM" } }
-            yaxis:
-              - min: 0
-                decimals: 1
-            series:
-              - entity: sensor.solar_charger_historico_diario
-                name: Coche
-                type: column
-                stack_group: red
-                color: "#2FB5A0"
-                unit: €
-                float_precision: 2
-                data_generator: |
-                  return (entity.attributes.dias || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.coche_red_eur ?? 0]);
-                show: { legend_value: false }
-              - entity: sensor.solar_charger_historico_diario
-                name: Hogar
-                type: column
-                stack_group: red
-                color: "#5B8BD0"
-                unit: €
-                float_precision: 2
-                data_generator: |
-                  return (entity.attributes.dias || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.hogar_red_eur ?? 0]);
-                show: { legend_value: false }
-          - type: custom:apexcharts-card
-            section_mode: true
-            grid_options: { columns: full, rows: 4 }
-            graph_span: 30d
-            span: { end: day }
-            stacked: true
-            header:
-              show: true
-              title: Energía comprada por día (kWh)
-            apex_config:
-              plotOptions: { bar: { columnWidth: "70%", borderRadius: 2 } }
-              legend: { show: true, position: top }
-              dataLabels: { enabled: false }
-              xaxis: { labels: { format: "dd/MM" } }
-              tooltip: { shared: true, intersect: false, x: { format: "ddd dd/MM" } }
-            yaxis:
-              - min: 0
-                decimals: 0
-            series:
-              - entity: sensor.solar_charger_historico_diario
-                name: Coche
-                type: column
-                stack_group: red
-                color: "#2FB5A0"
-                unit: kWh
-                float_precision: 2
-                data_generator: |
-                  return (entity.attributes.dias || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.coche_red ?? 0]);
-                show: { legend_value: false }
-              - entity: sensor.solar_charger_historico_diario
-                name: Hogar
-                type: column
-                stack_group: red
-                color: "#5B8BD0"
-                unit: kWh
-                float_precision: 2
-                data_generator: |
-                  return (entity.attributes.dias || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.hogar_red ?? 0]);
-                show: { legend_value: false }
-
       # ================================================================== FACTURA
       - type: grid
         cards:
@@ -874,6 +766,114 @@ views:
                 float_precision: 2
                 data_generator: |
                   return (entity.attributes.prevision || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.acum]);
+                show: { legend_value: false }
+
+      # ================================================================== IMPORTADO DE LA RED (30 DÍAS)
+      # Solo la energía que se ha comprado a la red, separada entre coche y hogar, en kWh y en €.
+      # Reparto de cada hora: el sol cubre primero el hogar; lo que falta se compra a la red.
+      # Coste: precio del tramo de esa hora con impuesto eléctrico e IVA (sin potencia ni excedentes).
+      - type: grid
+        column_span: 2
+        cards:
+          - type: heading
+            heading: Comprado a la red · 30 días
+            icon: mdi:transmission-tower-import
+          - type: markdown
+            grid_options: { columns: full }
+            content: |
+              {% set d = state_attr('sensor.solar_charger_historico_diario', 'dias') or [] %}
+              {% macro k(x) %}{{ '%.1f' | format(x) | replace('.', ',') }} kWh{% endmacro %}
+              {% macro e(x) %}{{ '%.2f' | format(x) | replace('.', ',') }} €{% endmacro %}
+              {% set ck = d | sum(attribute='coche_red') %}{% set hk = d | sum(attribute='hogar_red') %}
+              {% set ce = d | selectattr('coche_red_eur', 'defined') | sum(attribute='coche_red_eur') %}
+              {% set he = d | selectattr('hogar_red_eur', 'defined') | sum(attribute='hogar_red_eur') %}
+              {% set te = ce + he %}
+
+              | | Energía | Coste | Precio medio | Parte del coste |
+              |:--|--:|--:|--:|--:|
+              | 🚗 **Coche** | {{ k(ck) }} | **{{ e(ce) }}** | {{ ('%.3f' | format(ce / ck) | replace('.', ',')) if ck > 0 else '—' }} €/kWh | {{ ((100 * ce / te) | round(0) | int) if te > 0 else 0 }} % |
+              | 🏠 **Hogar** | {{ k(hk) }} | **{{ e(he) }}** | {{ ('%.3f' | format(he / hk) | replace('.', ',')) if hk > 0 else '—' }} €/kWh | {{ ((100 * he / te) | round(0) | int) if te > 0 else 0 }} % |
+              | **Total** | {{ k(ck + hk) }} | **{{ e(te) }}** | {{ ('%.3f' | format(te / (ck + hk)) | replace('.', ',')) if ck + hk > 0 else '—' }} €/kWh | |
+
+              _Solo energía comprada a la red, al precio de su hora y con impuestos. No incluye potencia,
+              bono social, contador ni el descuento por excedentes (están en «Factura del mes»)._
+          - type: custom:apexcharts-card
+            section_mode: true
+            grid_options: { columns: full, rows: 5 }
+            graph_span: 30d
+            span: { end: day }
+            stacked: true
+            header:
+              show: true
+              title: Coste de la energía comprada por día (€)
+            apex_config:
+              plotOptions: { bar: { columnWidth: "70%", borderRadius: 2 } }
+              legend: { show: true, position: top }
+              dataLabels: { enabled: false }
+              xaxis: { labels: { format: "dd/MM" } }
+              tooltip: { shared: true, intersect: false, x: { format: "ddd dd/MM" } }
+            yaxis:
+              - min: 0
+                decimals: 1
+            series:
+              - entity: sensor.solar_charger_historico_diario
+                name: Coche
+                type: column
+                stack_group: red
+                color: "#2FB5A0"
+                unit: €
+                float_precision: 2
+                data_generator: |
+                  return (entity.attributes.dias || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.coche_red_eur ?? 0]);
+                show: { legend_value: false }
+              - entity: sensor.solar_charger_historico_diario
+                name: Hogar
+                type: column
+                stack_group: red
+                color: "#5B8BD0"
+                unit: €
+                float_precision: 2
+                data_generator: |
+                  return (entity.attributes.dias || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.hogar_red_eur ?? 0]);
+                show: { legend_value: false }
+          - type: custom:apexcharts-card
+            section_mode: true
+            grid_options: { columns: full, rows: 4 }
+            graph_span: 30d
+            span: { end: day }
+            stacked: true
+            header:
+              show: true
+              title: Energía comprada por día (kWh)
+            apex_config:
+              plotOptions: { bar: { columnWidth: "70%", borderRadius: 2 } }
+              legend: { show: true, position: top }
+              dataLabels: { enabled: false }
+              xaxis: { labels: { format: "dd/MM" } }
+              tooltip: { shared: true, intersect: false, x: { format: "ddd dd/MM" } }
+            yaxis:
+              - min: 0
+                decimals: 0
+            series:
+              - entity: sensor.solar_charger_historico_diario
+                name: Coche
+                type: column
+                stack_group: red
+                color: "#2FB5A0"
+                unit: kWh
+                float_precision: 2
+                data_generator: |
+                  return (entity.attributes.dias || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.coche_red ?? 0]);
+                show: { legend_value: false }
+              - entity: sensor.solar_charger_historico_diario
+                name: Hogar
+                type: column
+                stack_group: red
+                color: "#5B8BD0"
+                unit: kWh
+                float_precision: 2
+                data_generator: |
+                  return (entity.attributes.dias || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.hogar_red ?? 0]);
                 show: { legend_value: false }
 
       # ================================================================== OBJETIVO ANUAL
