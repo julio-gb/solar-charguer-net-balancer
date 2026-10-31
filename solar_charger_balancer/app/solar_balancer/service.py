@@ -11,7 +11,7 @@ from .billing import compensation_effect, compute_bill, month_forecast, solar_va
 from .charger import Charger, ChargerEntities, ChargerReadings
 from .config import Config
 from .controller import ControlInputs, ControlParams, decide, minutes_left_in_hour
-from .energy import CounterTracker, HourRecord, compute_stats, coverage, daily_history
+from .energy import CounterTracker, HourRecord, compute_stats, coverage, daily_history, month_split
 from .forced import ForcedCharge, ScheduleError, parse_start
 from .ha_client import HAClient, HAError, is_available, to_float
 from .soc import SocEstimator
@@ -19,7 +19,7 @@ from .storage import save_state
 from .tariff import Tariff
 
 _LOGGER = logging.getLogger(__name__)
-VERSION = "0.6.1"
+VERSION = "0.7.0"
 KEEP_DAYS = 400
 TRACE_LEN = 2500
 NOTIFICATION_ID = "solar_charger_balancer_offline"
@@ -79,6 +79,7 @@ class Balancer:
         self.forced: ForcedCharge | None = None
         self.forced_inputs = {"start": "00:00", "hours": 4.0, "current": config.max_current}
         self.forced_message = "Sin carga programada"
+        self.stats_view = "General"
         self.soc = SocEstimator(config.car_battery_kwh, config.charging_efficiency)
         self.last_switch: datetime | None = None
         self.last_decision_at: datetime | None = None
@@ -98,6 +99,7 @@ class Balancer:
     def restore(self, data: dict, now: datetime) -> None:
         self.records = [HourRecord.from_dict(r) for r in data.get("records", [])]
         self.enabled = data.get("enabled", True)
+        self.stats_view = data.get("stats_view", "General")
         self.forced_inputs.update(data.get("forced_inputs", {}))
         if data.get("forced"):
             self.forced = ForcedCharge.from_dict(data["forced"])
@@ -131,6 +133,7 @@ class Balancer:
             "counters": {k: c.last for k, c in self.counters.items()},
             "ev_total": self.ev_total,
             "enabled": self.enabled,
+            "stats_view": self.stats_view,
             "forced": self.forced.to_dict() if self.forced else None,
             "forced_inputs": self.forced_inputs,
             "soc": self.soc.to_dict(),
@@ -179,6 +182,9 @@ class Balancer:
                 self.charger.release()
             self.event("Control automático " + ("activado" if self.enabled else "desactivado"))
             self.last_decision_at = None
+        elif key == "stats_view":
+            if payload in ("General", "Coche", "Hogar"):
+                self.stats_view = payload
         elif key == "forced_start":
             self.forced_inputs["start"] = payload.strip()
         elif key in ("forced_hours", "forced_current"):
@@ -473,7 +479,7 @@ class Balancer:
             p("ev_solar_yesterday", round(ev_solar, 2))
             p("ev_grid_yesterday", round(sum(r.ev for r in yesterday) - ev_solar, 2))
         days = daily_history(closed + [current], now, 30)
-        p("daily_history", len(days), {"dias": days})
+        p("daily_history", len(days), {"dias": days, "mes": month_split(closed + [current], now)})
         self._publish_billing(closed, current, now)
         p("savings_today", round(stats.savings_today, 2))
         p("savings_month", round(stats.savings_month, 2))
@@ -484,6 +490,7 @@ class Balancer:
         p("last_event", f"{visible[0]['time']} {visible[0]['text']}".strip()[:250], {"eventos": list(self.events)[:20]})
         p("charger_online", self.charger.online)
         p("enabled", self.enabled)
+        p("stats_view", self.stats_view)
         p("forced_start", self.forced_inputs["start"])
         p("forced_hours", float(self.forced_inputs["hours"]))
         p("forced_current", int(self.forced_inputs["current"]))

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.0
+- «Histórico diario» incluye, por día y para el mes en curso, la energía con sol y de la red
+  del consumo total, del coche y del hogar.
+- Nueva entidad «Vista estadísticas» (General / Coche / Hogar) para el selector del dashboard.
+- Dashboard: sección «Consumo» que une «Últimos 30 días» y «Coche este mes», con selector
+  de vista y escalas automáticas.
+
 ## 0.6.1
 - Nuevo sensor «Previsión factura mes»: lo ya consumido más la media de los últimos 7 días
   completos para los días que quedan (y los del mes sin datos). Incluye el coste por día

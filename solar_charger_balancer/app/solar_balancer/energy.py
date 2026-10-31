@@ -65,6 +65,11 @@ class HourRecord:
         return self.gen - self.consumption
 
     @property
+    def home_solar(self) -> float:
+        """Energía del hogar cubierta por solar en el balance horario (el hogar va primero)."""
+        return min(self.home, self.gen)
+
+    @property
     def ev_solar(self) -> float:
         """Energía del coche cubierta por solar en el balance horario (el hogar va primero)."""
         return min(self.ev, max(0.0, self.gen - self.home))
@@ -156,8 +161,22 @@ def compute_stats(records: list[HourRecord], current: HourRecord, now: datetime,
     )
 
 
+def _split(recs) -> dict:
+    """kWh con sol y de la red del total, del coche y del hogar."""
+    out = {}
+    for key, total, solar in (("total", "consumption", "self_consumed"), ("coche", "ev", "ev_solar"),
+                              ("hogar", "home", "home_solar")):
+        sol = _sum(recs, solar)
+        out[f"{key}_solar"] = round(sol, 2)
+        out[f"{key}_red"] = round(_sum(recs, total) - sol, 2)
+    return out
+
+
 def daily_history(records: list[HourRecord], now: datetime, days: int) -> list[dict]:
-    """Resumen por día de los últimos `days` días (incluido hoy, en curso) para las gráficas."""
+    """Resumen por día de los últimos `days` días (incluido hoy, en curso) para las gráficas.
+
+    «solar» y «red» son del coche (se mantienen por compatibilidad con dashboards anteriores).
+    """
     first = (now - timedelta(days=days - 1)).date()
     by_day: dict = {}
     for r in records:
@@ -167,9 +186,13 @@ def daily_history(records: list[HourRecord], now: datetime, days: int) -> list[d
     out = []
     for day in sorted(by_day):
         recs = by_day[day]
-        ev = _sum(recs, "ev")
-        ev_solar = _sum(recs, "ev_solar")
+        split = _split(recs)
         cov = coverage(recs)
-        out.append({"d": day.isoformat(), "solar": round(ev_solar, 2), "red": round(ev - ev_solar, 2),
-                    "cob": None if cov is None else round(cov, 1)})
+        out.append({"d": day.isoformat(), "solar": split["coche_solar"], "red": split["coche_red"],
+                    "cob": None if cov is None else round(cov, 1), **split})
     return out
+
+
+def month_split(records: list[HourRecord], now: datetime) -> dict:
+    """Reparto por origen del mes natural en curso."""
+    return _split([r for r in records if (r.start.year, r.start.month) == (now.year, now.month)])

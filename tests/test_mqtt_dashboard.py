@@ -16,7 +16,7 @@ def test_slugify_matches_home_assistant_style():
 def test_dashboard_only_uses_addon_entities():
     text = (ROOT / "dashboards" / "solar_charger.yaml").read_text(encoding="utf-8")
     yaml.safe_load(text)
-    used = set(re.findall(r"\b(?:sensor|binary_sensor|switch|text|number|button)\.solar_charger_[a-z0-9_]+", text))
+    used = set(re.findall(r"\b(?:sensor|binary_sensor|switch|text|number|button|select)\.solar_charger_[a-z0-9_]+", text))
     known = {e.entity_id for e in ENTITIES}
     assert used and used <= known, used - known
 
@@ -83,3 +83,13 @@ def test_dashboard_apexcharts_options_are_valid():
             for key in ("group_by", "statistics", "show"):
                 assert set(series.get(key, {})) <= APEX_NESTED[key]
             assert "color_threshold" not in series or chart.get("experimental", {}).get("color_threshold")
+
+
+def test_stats_view_select_discovery():
+    loop = asyncio.new_event_loop()
+    bridge = MqttBridge(loop, lambda k, v: None)
+    view = next(e for e in ENTITIES if e.key == "stats_view")
+    payload = bridge._discovery(view)
+    assert view.entity_id == "select.solar_charger_vista_estadisticas"
+    assert payload["options"] == ["General", "Coche", "Hogar"] and "command_topic" in payload
+    loop.close()

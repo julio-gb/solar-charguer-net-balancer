@@ -34,7 +34,7 @@ def slugify(text: str) -> str:
 
 @dataclass(frozen=True)
 class Entity:
-    component: str  # sensor, binary_sensor, switch, number, text, button
+    component: str  # sensor, binary_sensor, switch, number, text, button, select
     key: str
     name: str
     extra: dict = field(default_factory=dict)
@@ -123,10 +123,13 @@ ENTITIES: list[Entity] = [
            {"step": 1, "unit_of_measurement": "A", "mode": "slider", "icon": "mdi:current-ac"}),
     Entity("button", "forced_schedule", "Programar carga forzada", {"icon": "mdi:calendar-plus"}),
     Entity("button", "forced_cancel", "Cancelar carga forzada", {"icon": "mdi:calendar-remove"}),
+    # Vista de la sección «Consumo» del dashboard (solo afecta a lo que se muestra).
+    Entity("select", "stats_view", "Vista estadísticas",
+           {"icon": "mdi:view-dashboard-variant", "options": ["General", "Coche", "Hogar"]}),
 ]
 
 BY_KEY = {e.key: e for e in ENTITIES}
-COMMANDABLE = {"switch", "number", "text", "button"}
+COMMANDABLE = {"switch", "number", "text", "button", "select"}
 
 
 class MqttBridge:
@@ -155,7 +158,7 @@ class MqttBridge:
 
     def _device(self) -> dict:
         return {"identifiers": [PREFIX], "name": DEVICE_NAME, "manufacturer": "Solar Charger Net Balancer",
-                "model": "Addon Home Assistant", "sw_version": "0.6.1"}
+                "model": "Addon Home Assistant", "sw_version": "0.7.0"}
 
     def _discovery(self, entity: Entity) -> dict:
         payload: dict[str, Any] = {

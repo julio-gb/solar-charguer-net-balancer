@@ -39,4 +39,16 @@ def test_daily_history():
             HourRecord("2026-10-16T22:00:00+02:00", 0.0, 0.2, 1.0, 0.119, 0.02),
             HourRecord("2026-09-01T12:00:00+02:00", 1.0, 0.2, 0.0, 0.119, 0.02)]   # fuera de los 30 días
     days = daily_history(recs, datetime.fromisoformat("2026-10-17T10:00:00+02:00"), 30)
-    assert days == [{"d": "2026-10-16", "solar": 0.6, "red": 1.0, "cob": 40.0}]   # 0,8 solar / 2,0 consumo
+    assert days == [{"d": "2026-10-16", "solar": 0.6, "red": 1.0, "cob": 40.0,   # 0,8 solar / 2,0 consumo
+                     "total_solar": 0.8, "total_red": 1.2, "coche_solar": 0.6, "coche_red": 1.0,
+                     "hogar_solar": 0.2, "hogar_red": 0.2}]
+
+
+def test_month_split_only_current_month():
+    from solar_balancer.energy import month_split
+    recs = [HourRecord("2026-10-16T12:00:00+02:00", 1.0, 0.3, 0.6, 0.119, 0.02),   # hogar 0,3 sol; coche 0,6 sol
+            HourRecord("2026-10-16T22:00:00+02:00", 0.0, 0.2, 1.0, 0.119, 0.02),
+            HourRecord("2026-09-30T12:00:00+02:00", 1.0, 0.2, 0.0, 0.119, 0.02)]   # mes anterior
+    split = month_split(recs, datetime.fromisoformat("2026-10-17T10:00:00+02:00"))
+    assert split == {"total_solar": 0.9, "total_red": 1.2, "coche_solar": 0.6, "coche_red": 1.0,
+                     "hogar_solar": 0.3, "hogar_red": 0.2}
