@@ -416,40 +416,78 @@ views:
           - type: heading
             heading: Últimos 30 días
             icon: mdi:calendar-month
+          # Carga del coche: totales y una gráfica por origen, cada una con su escala, para que
+          # las cargas grandes de la red no aplasten las cargas con sol.
+          - type: custom:mushroom-template-card
+            entity: sensor.solar_charger_historico_diario
+            primary: >-
+              {%- set d = state_attr(entity, 'dias') or [] %}
+              {%- set sol = d | sum(attribute='solar') %}
+              {%- set red = d | sum(attribute='red') %}
+              Coche, 30 días: {{ '%.1f' | format(sol + red) | replace('.', ',') }} kWh
+            secondary: >-
+              {%- set d = state_attr(entity, 'dias') or [] %}
+              {%- set sol = d | sum(attribute='solar') %}
+              {%- set red = d | sum(attribute='red') %}
+              Con sol {{ '%.1f' | format(sol) | replace('.', ',') }} kWh
+              {%- if sol + red > 0 %} ({{ (100 * sol / (sol + red)) | round(0) | int }} %){% endif %}
+              · De la red {{ '%.1f' | format(red) | replace('.', ',') }} kWh
+            icon: mdi:car-electric
+            color: amber
+            grid_options: { columns: full }
           - type: custom:apexcharts-card
             section_mode: true
-            grid_options: { columns: full, rows: 5 }
+            grid_options: { columns: full, rows: 4 }
             graph_span: 30d
             span: { end: day }
-            stacked: true
             header:
               show: true
-              title: Energía cargada en el coche por día (kWh)
+              title: Carga del coche con sol (kWh/día)
             apex_config:
-              plotOptions: { bar: { columnWidth: "80%", borderRadius: 2 } }
-              legend: { show: true, position: top }
+              plotOptions: { bar: { columnWidth: "70%", borderRadius: 3 } }
+              legend: { show: false }
               dataLabels: { enabled: false }
               xaxis: { labels: { format: "dd/MM" } }
-              tooltip: { x: { format: "dd/MM" } }
+              tooltip: { x: { format: "ddd dd/MM" } }
             yaxis:
               - min: 0
-                decimals: 0
+                max: "|+15%|"
+                decimals: 1
             series:
               # Datos del sensor «Histórico diario» del addon (últimos 30 días, hoy incluido).
               - entity: sensor.solar_charger_historico_diario
                 name: Con sol
                 type: column
-                stack_group: coche
                 color: "#F2A93B"
+                unit: kWh
                 float_precision: 1
                 data_generator: |
                   return (entity.attributes.dias || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.solar]);
                 show: { legend_value: false }
+          - type: custom:apexcharts-card
+            section_mode: true
+            grid_options: { columns: full, rows: 3 }
+            graph_span: 30d
+            span: { end: day }
+            header:
+              show: true
+              title: Carga del coche de la red (kWh/día)
+            apex_config:
+              plotOptions: { bar: { columnWidth: "70%", borderRadius: 3 } }
+              legend: { show: false }
+              dataLabels: { enabled: false }
+              xaxis: { labels: { format: "dd/MM" } }
+              tooltip: { x: { format: "ddd dd/MM" } }
+            yaxis:
+              - min: 0
+                max: "|+15%|"
+                decimals: 1
+            series:
               - entity: sensor.solar_charger_historico_diario
                 name: De la red
                 type: column
-                stack_group: coche
                 color: "#8A94A6"
+                unit: kWh
                 float_precision: 1
                 data_generator: |
                   return (entity.attributes.dias || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.red]);
