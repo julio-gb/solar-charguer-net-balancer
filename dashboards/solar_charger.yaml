@@ -830,18 +830,18 @@ views:
             grid_options: { columns: full }
             content: |
               {% set d = state_attr('sensor.solar_charger_historico_diario', 'dias') or [] %}
-              {% macro k(x) %}{{ '%.1f' | format(x) | replace('.', ',') }} kWh{% endmacro %}
-              {% macro e(x) %}{{ '%.2f' | format(x) | replace('.', ',') }} €{% endmacro %}
+              {% macro k(x) %}{{ '%.1f' | format(x) | replace('.', ',') }}{% endmacro %}
+              {% macro e(x) %}{{ '%.2f' | format(x) | replace('.', ',') }}{% endmacro %}
               {% set ck = d | sum(attribute='coche_red') %}{% set hk = d | sum(attribute='hogar_red') %}
               {% set ce = d | selectattr('coche_red_eur', 'defined') | sum(attribute='coche_red_eur') %}
               {% set he = d | selectattr('hogar_red_eur', 'defined') | sum(attribute='hogar_red_eur') %}
               {% set te = ce + he %}
 
-              | | Energía | Coste | Precio medio | Parte del coste |
+              | | kWh | € | €/kWh | % del € |
               |:--|--:|--:|--:|--:|
-              | 🚗 **Coche** | {{ k(ck) }} | **{{ e(ce) }}** | {{ ('%.3f' | format(ce / ck) | replace('.', ',')) if ck > 0 else '—' }} €/kWh | {{ ((100 * ce / te) | round(0) | int) if te > 0 else 0 }} % |
-              | 🏠 **Hogar** | {{ k(hk) }} | **{{ e(he) }}** | {{ ('%.3f' | format(he / hk) | replace('.', ',')) if hk > 0 else '—' }} €/kWh | {{ ((100 * he / te) | round(0) | int) if te > 0 else 0 }} % |
-              | **Total** | {{ k(ck + hk) }} | **{{ e(te) }}** | {{ ('%.3f' | format(te / (ck + hk)) | replace('.', ',')) if ck + hk > 0 else '—' }} €/kWh | |
+              | 🚗 **Coche** | {{ k(ck) }} | **{{ e(ce) }}** | {{ ('%.3f' | format(ce / ck) | replace('.', ',')) if ck > 0 else '—' }} | {{ ((100 * ce / te) | round(0) | int) if te > 0 else 0 }} |
+              | 🏠 **Hogar** | {{ k(hk) }} | **{{ e(he) }}** | {{ ('%.3f' | format(he / hk) | replace('.', ',')) if hk > 0 else '—' }} | {{ ((100 * he / te) | round(0) | int) if te > 0 else 0 }} |
+              | **Total** | {{ k(ck + hk) }} | **{{ e(te) }}** | {{ ('%.3f' | format(te / (ck + hk)) | replace('.', ',')) if ck + hk > 0 else '—' }} | |
 
               _Solo energía comprada a la red, al precio de su hora y con impuestos. No incluye potencia,
               bono social, contador ni el descuento por excedentes (están en «Factura del mes»)._
@@ -1012,6 +1012,8 @@ views:
                   {% macro e(v) %}{{ '%.2f' | format(v | float(0)) | replace('.', ',') }} €{% endmacro %}
                   {% macro k(v) %}{{ '%.1f' | format(v | float(0)) | replace('.', ',') }} kWh{% endmacro %}
                   {% macro f(d) %}{{ d[8:10] | int }}/{{ d[5:7] | int }}{% endmacro %}
+                  {% macro n1(v) %}{{ '%.1f' | format(v | float(0)) | replace('.', ',') }}{% endmacro %}
+                  {% macro n2(v) %}{{ '%.2f' | format(v | float(0)) | replace('.', ',') }}{% endmacro %}
                   {% set a = state_attr(s, 'actual') or {} %}
                   {% set p = state_attr(s, 'anterior') or {} %}
                   {% if not a and not p -%}
@@ -1029,13 +1031,13 @@ views:
 
                   **Energía comprada por periodo**
 
-                  | Periodo | Este mes | € | Mes anterior | € |
+                  | | kWh mes | € mes | kWh ant. | € ant. |
                   |:--|--:|--:|--:|--:|
                   {%- set names = ((a.get('periodos') or []) + (p.get('periodos') or [])) | map(attribute='periodo') | unique | list %}
                   {%- for n in names %}
                   {%- set x = (a.get('periodos') or []) | selectattr('periodo', 'eq', n) | first | default({}) %}
                   {%- set y = (p.get('periodos') or []) | selectattr('periodo', 'eq', n) | first | default({}) %}
-                  | {{ n }} | {{ k(x.kwh) if x else '—' }} | {{ e(x.eur) if x else '—' }} | {{ k(y.kwh) if y else '—' }} | {{ e(y.eur) if y else '—' }} |
+                  | {{ n }} | {{ n1(x.kwh) if x else '—' }} | {{ n2(x.eur) if x else '—' }} | {{ n1(y.kwh) if y else '—' }} | {{ n2(y.eur) if y else '—' }} |
                   {%- endfor %}
 
                   _€ de energía sin impuestos, al precio de cada periodo._
