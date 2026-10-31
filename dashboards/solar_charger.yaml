@@ -324,179 +324,6 @@ views:
     type: sections
     max_columns: 3
     sections:
-      # ================================================================== FACTURA
-      - type: grid
-        cards:
-          - type: heading
-            heading: Factura del mes
-            icon: mdi:receipt-text
-          - type: custom:mushroom-template-card
-            entity: sensor.solar_charger_coste_mes
-            primary: >-
-              Este mes: {{ '%.2f' | format(states(entity) | float(0)) | replace('.', ',') }} €
-            secondary: >-
-              {%- set f = states('sensor.solar_charger_prevision_factura_mes') %}
-              {%- if is_number(f) %}Previsión a fin de mes: {{ '%.2f' | format(f | float) | replace('.', ',') }} €
-              {%- else %}Previsión: faltan días completos{% endif %} · toca para el desglose
-            multiline_secondary: true
-            icon: mdi:receipt-text-outline
-            color: blue
-            tap_action: { action: navigate, navigation_path: "#factura" }
-            grid_options: { columns: full }
-          - type: markdown
-            grid_options: { columns: full }
-            content: |
-              {% macro e(v) %}{{ '%.2f' | format(v | float(0)) | replace('.', ',') }} €{% endmacro %}
-              {% set sv = 'sensor.solar_charger_valor_solar_autoconsumida' %}
-              {% set dx = 'sensor.solar_charger_descuento_excedentes' %}
-              {% macro n(v) %}{{ ('−' ~ e(v)) if (v | float(0)) >= 0.005 else e(0) }}{% endmacro %}
-
-              | | Ayer | Mes |
-              |:--|--:|--:|
-              | **Coste** | **{{ e(states('sensor.solar_charger_coste_ayer')) }}** | **{{ e(states('sensor.solar_charger_coste_mes')) }}** |
-              | Solar usada ¹ | {{ e(state_attr(sv, 'ayer')) }} | {{ e(state_attr(sv, 'mes')) }} |
-              | Excedentes ² | {{ n(state_attr(dx, 'ayer')) }} | {{ n(state_attr(dx, 'mes')) }} |
-
-              En el año: solar usada {{ e(state_attr(sv, 'ano')) }} · excedentes {{ n(state_attr(dx, 'ano')) }}
-
-              _¹ Lo que habría costado en la red. ² Rebaja en la factura. Todo con impuestos._
-          - type: custom:apexcharts-card
-            section_mode: true
-            grid_options: { columns: full, rows: 5 }
-            graph_span: 31d
-            span: { start: month }
-            header:
-              show: true
-              title: Coste de cada día con impuestos (€)
-            apex_config:
-              plotOptions: { bar: { columnWidth: "70%", borderRadius: 3 } }
-              legend: { show: true, position: top }
-              dataLabels: { enabled: false }
-              xaxis: { labels: { format: "dd" } }
-              tooltip: { shared: true, intersect: false, x: { format: "ddd dd/MM" } }
-            yaxis:
-              - min: 0
-                decimals: 1
-            series:
-              # Datos del sensor «Previsión factura mes» (atributo dias: un elemento por día del mes).
-              # Barra: lo que suma el día a la factura. Líneas: la parte fija (se paga aunque no
-              # consumas) y la media de los días ya cerrados, para ver qué días se salen.
-              - entity: sensor.solar_charger_prevision_factura_mes
-                name: Coste del día
-                type: column
-                color: "#4A90D9"
-                unit: €
-                float_precision: 2
-                data_generator: |
-                  return (entity.attributes.dias || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.total]);
-                show: { legend_value: false }
-              - entity: sensor.solar_charger_prevision_factura_mes
-                name: Parte fija
-                type: line
-                # Sin punto extra en «ahora»: un punto fuera de las 12:00 estrecha las barras.
-                extend_to: false
-                color: "#8A94A6"
-                stroke_width: 2
-                stroke_dash: 4
-                unit: €
-                float_precision: 2
-                data_generator: |
-                  // Potencia + bono social + contador, con los impuestos que les corresponden.
-                  return (entity.attributes.dias || []).map(d => {
-                    const base = d.fijo + d.energia;
-                    const k = base > 0 ? d.total / base : 1;
-                    return [new Date(d.d + "T12:00:00").getTime(), d.fijo * k];
-                  });
-                show: { legend_value: false }
-              - entity: sensor.solar_charger_prevision_factura_mes
-                name: Media del mes
-                type: line
-                extend_to: false
-                color: "#E0A030"
-                stroke_width: 2
-                unit: €
-                float_precision: 2
-                data_generator: |
-                  // Media de los días cerrados (sin hoy, que va a medias), dibujada en todo el mes.
-                  const dias = entity.attributes.dias || [];
-                  const n = new Date();
-                  const hoy = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
-                  const cerrados = dias.filter(d => d.d < hoy);
-                  if (!cerrados.length) return [];
-                  const media = cerrados.reduce((s, d) => s + d.total, 0) / cerrados.length;
-                  return dias.map(d => [new Date(d.d + "T12:00:00").getTime(), media]);
-                show: { legend_value: false }
-          - type: custom:apexcharts-card
-            section_mode: true
-            grid_options: { columns: full, rows: 4 }
-            graph_span: 31d
-            span: { start: month }
-            header:
-              show: true
-              title: Acumulado del mes (€) · discontinua = previsión
-            apex_config:
-              legend: { show: true, position: top }
-              dataLabels: { enabled: false }
-              xaxis: { labels: { format: "dd" } }
-              tooltip: { x: { format: "dd/MM" } }
-            yaxis:
-              - min: 0
-                decimals: 0
-            series:
-              - entity: sensor.solar_charger_prevision_factura_mes
-                name: Real
-                type: line
-                color: "#4A90D9"
-                stroke_width: 3
-                float_precision: 2
-                data_generator: |
-                  return (entity.attributes.dias || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.acum]);
-                show: { legend_value: false }
-              - entity: sensor.solar_charger_prevision_factura_mes
-                name: Previsión
-                type: line
-                color: "#8A94A6"
-                stroke_width: 2
-                stroke_dash: 6
-                float_precision: 2
-                data_generator: |
-                  return (entity.attributes.prevision || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.acum]);
-                show: { legend_value: false }
-
-      # ================================================================== OBJETIVO ANUAL
-      - type: grid
-        cards:
-          - type: heading
-            heading: Objetivo anual
-            icon: mdi:flag-checkered
-          - type: gauge
-            entity: sensor.solar_charger_cobertura_solar_ano
-            name: Cobertura solar del año (objetivo 60 %)
-            min: 0
-            max: 100
-            needle: true
-            severity: { green: 60, yellow: 40, red: 0 }
-            grid_options: { columns: full }
-          - type: entities
-            state_color: true
-            entities:
-              - entity: sensor.solar_charger_proyeccion_cobertura_ano
-                type: custom:multiple-entity-row
-                name: Cobertura
-                icon: mdi:solar-power
-                state_header: 31 dic
-                format: precision0
-                entities:
-                  - entity: sensor.solar_charger_cobertura_solar_ayer
-                    name: Ayer
-                    format: precision0
-                  - entity: sensor.solar_charger_cobertura_solar_mes
-                    name: Mes
-                    format: precision0
-              - entity: sensor.solar_charger_faltan_para_objetivo
-                name: Faltan para el 60 %
-                icon: mdi:flag-checkered
-
       # ================================================================== CONSUMO (30 DÍAS Y MES)
       # Selector General / Coche / Hogar (entidad del addon): cambia el resumen y las gráficas.
       # Una gráfica por origen, cada una con su escala, para que las cargas grandes de la red
@@ -799,6 +626,179 @@ views:
                   data_generator: |
                     return (entity.attributes.dias || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.hogar_red]);
                   show: { legend_value: false }
+
+      # ================================================================== FACTURA
+      - type: grid
+        cards:
+          - type: heading
+            heading: Factura del mes
+            icon: mdi:receipt-text
+          - type: custom:mushroom-template-card
+            entity: sensor.solar_charger_coste_mes
+            primary: >-
+              Este mes: {{ '%.2f' | format(states(entity) | float(0)) | replace('.', ',') }} €
+            secondary: >-
+              {%- set f = states('sensor.solar_charger_prevision_factura_mes') %}
+              {%- if is_number(f) %}Previsión a fin de mes: {{ '%.2f' | format(f | float) | replace('.', ',') }} €
+              {%- else %}Previsión: faltan días completos{% endif %} · toca para el desglose
+            multiline_secondary: true
+            icon: mdi:receipt-text-outline
+            color: blue
+            tap_action: { action: navigate, navigation_path: "#factura" }
+            grid_options: { columns: full }
+          - type: markdown
+            grid_options: { columns: full }
+            content: |
+              {% macro e(v) %}{{ '%.2f' | format(v | float(0)) | replace('.', ',') }} €{% endmacro %}
+              {% set sv = 'sensor.solar_charger_valor_solar_autoconsumida' %}
+              {% set dx = 'sensor.solar_charger_descuento_excedentes' %}
+              {% macro n(v) %}{{ ('−' ~ e(v)) if (v | float(0)) >= 0.005 else e(0) }}{% endmacro %}
+
+              | | Ayer | Mes |
+              |:--|--:|--:|
+              | **Coste** | **{{ e(states('sensor.solar_charger_coste_ayer')) }}** | **{{ e(states('sensor.solar_charger_coste_mes')) }}** |
+              | Solar usada ¹ | {{ e(state_attr(sv, 'ayer')) }} | {{ e(state_attr(sv, 'mes')) }} |
+              | Excedentes ² | {{ n(state_attr(dx, 'ayer')) }} | {{ n(state_attr(dx, 'mes')) }} |
+
+              En el año: solar usada {{ e(state_attr(sv, 'ano')) }} · excedentes {{ n(state_attr(dx, 'ano')) }}
+
+              _¹ Lo que habría costado en la red. ² Rebaja en la factura. Todo con impuestos._
+          - type: custom:apexcharts-card
+            section_mode: true
+            grid_options: { columns: full, rows: 5 }
+            graph_span: 31d
+            span: { start: month }
+            header:
+              show: true
+              title: Coste de cada día con impuestos (€)
+            apex_config:
+              plotOptions: { bar: { columnWidth: "70%", borderRadius: 3 } }
+              legend: { show: true, position: top }
+              dataLabels: { enabled: false }
+              xaxis: { labels: { format: "dd" } }
+              tooltip: { shared: true, intersect: false, x: { format: "ddd dd/MM" } }
+            yaxis:
+              - min: 0
+                decimals: 1
+            series:
+              # Datos del sensor «Previsión factura mes» (atributo dias: un elemento por día del mes).
+              # Barra: lo que suma el día a la factura. Líneas: la parte fija (se paga aunque no
+              # consumas) y la media de los días ya cerrados, para ver qué días se salen.
+              - entity: sensor.solar_charger_prevision_factura_mes
+                name: Coste del día
+                type: column
+                color: "#4A90D9"
+                unit: €
+                float_precision: 2
+                data_generator: |
+                  return (entity.attributes.dias || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.total]);
+                show: { legend_value: false }
+              - entity: sensor.solar_charger_prevision_factura_mes
+                name: Parte fija
+                type: line
+                # Sin punto extra en «ahora»: un punto fuera de las 12:00 estrecha las barras.
+                extend_to: false
+                color: "#8A94A6"
+                stroke_width: 2
+                stroke_dash: 4
+                unit: €
+                float_precision: 2
+                data_generator: |
+                  // Potencia + bono social + contador, con los impuestos que les corresponden.
+                  return (entity.attributes.dias || []).map(d => {
+                    const base = d.fijo + d.energia;
+                    const k = base > 0 ? d.total / base : 1;
+                    return [new Date(d.d + "T12:00:00").getTime(), d.fijo * k];
+                  });
+                show: { legend_value: false }
+              - entity: sensor.solar_charger_prevision_factura_mes
+                name: Media del mes
+                type: line
+                extend_to: false
+                color: "#E0A030"
+                stroke_width: 2
+                unit: €
+                float_precision: 2
+                data_generator: |
+                  // Media de los días cerrados (sin hoy, que va a medias), dibujada en todo el mes.
+                  const dias = entity.attributes.dias || [];
+                  const n = new Date();
+                  const hoy = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+                  const cerrados = dias.filter(d => d.d < hoy);
+                  if (!cerrados.length) return [];
+                  const media = cerrados.reduce((s, d) => s + d.total, 0) / cerrados.length;
+                  return dias.map(d => [new Date(d.d + "T12:00:00").getTime(), media]);
+                show: { legend_value: false }
+          - type: custom:apexcharts-card
+            section_mode: true
+            grid_options: { columns: full, rows: 4 }
+            graph_span: 31d
+            span: { start: month }
+            header:
+              show: true
+              title: Acumulado del mes (€) · discontinua = previsión
+            apex_config:
+              legend: { show: true, position: top }
+              dataLabels: { enabled: false }
+              xaxis: { labels: { format: "dd" } }
+              tooltip: { x: { format: "dd/MM" } }
+            yaxis:
+              - min: 0
+                decimals: 0
+            series:
+              - entity: sensor.solar_charger_prevision_factura_mes
+                name: Real
+                type: line
+                color: "#4A90D9"
+                stroke_width: 3
+                float_precision: 2
+                data_generator: |
+                  return (entity.attributes.dias || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.acum]);
+                show: { legend_value: false }
+              - entity: sensor.solar_charger_prevision_factura_mes
+                name: Previsión
+                type: line
+                color: "#8A94A6"
+                stroke_width: 2
+                stroke_dash: 6
+                float_precision: 2
+                data_generator: |
+                  return (entity.attributes.prevision || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.acum]);
+                show: { legend_value: false }
+
+      # ================================================================== OBJETIVO ANUAL
+      - type: grid
+        cards:
+          - type: heading
+            heading: Objetivo anual
+            icon: mdi:flag-checkered
+          - type: gauge
+            entity: sensor.solar_charger_cobertura_solar_ano
+            name: Cobertura solar del año (objetivo 60 %)
+            min: 0
+            max: 100
+            needle: true
+            severity: { green: 60, yellow: 40, red: 0 }
+            grid_options: { columns: full }
+          - type: entities
+            state_color: true
+            entities:
+              - entity: sensor.solar_charger_proyeccion_cobertura_ano
+                type: custom:multiple-entity-row
+                name: Cobertura
+                icon: mdi:solar-power
+                state_header: 31 dic
+                format: precision0
+                entities:
+                  - entity: sensor.solar_charger_cobertura_solar_ayer
+                    name: Ayer
+                    format: precision0
+                  - entity: sensor.solar_charger_cobertura_solar_mes
+                    name: Mes
+                    format: precision0
+              - entity: sensor.solar_charger_faltan_para_objetivo
+                name: Faltan para el 60 %
+                icon: mdi:flag-checkered
 
       # ================================================================== VENTANA EMERGENTE
       # Desglose de la factura: se abre al tocar la tarjeta «Este mes».
