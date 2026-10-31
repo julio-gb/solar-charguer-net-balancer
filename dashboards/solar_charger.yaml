@@ -1,10 +1,11 @@
-# Dashboard «Carga solar» del addon Solar Charger Balancer (v0.9).
+# Dashboard «Carga solar» del addon Solar Charger Balancer (v1.0).
 # Tarjetas de HACS que usa: Mushroom, ApexCharts Card, mini-graph-card,
 # Multiple Entity Row, auto-entities, Bubble Card (ventanas emergentes) y Energy Custom Graph Card.
+# Pestañas: «Hoy» (datos en vivo y del día en curso) y «Estadísticas» (más de un día).
 # Uso: abrir el panel → ✏️ → ⋮ → Editor de configuración en bruto → pegar todo → Guardar.
 title: Carga solar
 views:
-  - title: Carga solar
+  - title: Hoy
     path: carga-solar
     icon: mdi:solar-power-variant
     type: sections
@@ -199,11 +200,135 @@ views:
                 show_in_legend: true
                 show_in_tooltip: true
 
+      # ================================================================== HOY
+      - type: grid
+        cards:
+          - type: heading
+            heading: Hoy
+            icon: mdi:calendar-today
+          - type: custom:mushroom-template-card
+            entity: sensor.solar_charger_coste_hoy
+            primary: >-
+              Coste de hoy: {{ '%.2f' | format(states(entity) | float(0)) | replace('.', ',') }} €
+            secondary: >-
+              {%- set sv = state_attr('sensor.solar_charger_valor_solar_autoconsumida', 'hoy') | float(0) %}
+              {%- set ex = state_attr('sensor.solar_charger_descuento_excedentes', 'hoy') | float(0) %}
+              Solar usada {{ '%.2f' | format(sv) | replace('.', ',') }} € ·
+              excedentes {{ ('−' if ex >= 0.005 else '') ~ ('%.2f' | format(ex) | replace('.', ',')) }} € · con impuestos
+            multiline_secondary: true
+            icon: mdi:receipt-text
+            color: blue
+            grid_options: { columns: full }
+          - type: custom:mushroom-template-card
+            entity: sensor.solar_charger_cobertura_solar_hoy
+            primary: >-
+              {{ (states(entity) | float | round(0) | int ~ ' %') if is_number(states(entity)) else '—' }}
+            secondary: Cobertura solar
+            icon: mdi:solar-power
+            color: "{{ 'green' if states(entity) | float(0) >= 60 else 'orange' }}"
+          - type: custom:mushroom-template-card
+            entity: sensor.solar_charger_coche_cargado_hoy
+            primary: "{{ '%.1f' | format(states(entity) | float(0)) | replace('.', ',') }} kWh"
+            secondary: >-
+              {%- set s = states('sensor.solar_charger_coche_solar_hoy') %}
+              Coche{% if is_number(s) %} · {{ s | float | round(0) | int }} % solar{% endif %}
+            icon: mdi:ev-plug-type2
+            color: teal
+          - type: custom:mushroom-template-card
+            entity: sensor.solar_charger_bateria_coche_estimada
+            primary: "Batería ≈ {{ states(entity) | float(0) | round(0) | int }} %"
+            secondary: >-
+              Último dato del coche: {{ state_attr(entity, 'ultimo_dato_real') | int(0) }} %
+            icon: >-
+              {% set n = ((states(entity) | float(0)) / 10) | round(0) | int * 10 %}
+              {{ 'mdi:battery' if n >= 100 else 'mdi:battery-outline' if n <= 0 else 'mdi:battery-' ~ n }}
+            color: teal
+            grid_options: { columns: full }
+
+      # ================================================================== VENTANAS EMERGENTES
+      # Se abren desde los botones de «Ahora»; no ocupan sitio en el panel.
+      - type: grid
+        cards:
+          - type: custom:bubble-card
+            card_type: pop-up
+            hash: "#carga-forzada"
+            name: Carga forzada
+            icon: mdi:calendar-clock
+            cards:
+              - type: custom:auto-entities
+                show_empty: false
+                card:
+                  type: entities
+                  title: Previsión solar (Open-Meteo)
+                filter:
+                  include:
+                    - integration: open_meteo_solar_forecast
+                      entity_id: "*_energy_production_today"
+                      options: { name: Hoy }
+                    - integration: open_meteo_solar_forecast
+                      entity_id: "*_energy_production_today_remaining"
+                      options: { name: Queda hoy }
+                    - integration: open_meteo_solar_forecast
+                      entity_id: "*_energy_production_tomorrow"
+                      options: { name: Mañana }
+              - type: entities
+                title: Programar
+                state_color: true
+                entities:
+                  - entity: sensor.solar_charger_carga_forzada_estado
+                    name: Estado
+                  - entity: text.solar_charger_carga_forzada_inicio
+                    name: Inicio (HH:MM o AAAA-MM-DD HH:MM)
+                  - entity: number.solar_charger_carga_forzada_duracion
+                    name: Duración
+                  - entity: number.solar_charger_carga_forzada_intensidad
+                    name: Intensidad
+                  - type: buttons
+                    entities:
+                      - entity: button.solar_charger_programar_carga_forzada
+                        name: Programar
+                        icon: mdi:calendar-plus
+                        tap_action:
+                          action: perform-action
+                          perform_action: button.press
+                          target: { entity_id: button.solar_charger_programar_carga_forzada }
+                      - entity: button.solar_charger_cancelar_carga_forzada
+                        name: Cancelar
+                        icon: mdi:calendar-remove
+                        tap_action:
+                          action: perform-action
+                          perform_action: button.press
+                          target: { entity_id: button.solar_charger_cancelar_carga_forzada }
+                  - type: divider
+                  - entity: switch.solar_charger_control_automatico
+                    name: Control automático
+          - type: custom:bubble-card
+            card_type: pop-up
+            hash: "#registro"
+            name: Registro
+            icon: mdi:text-box-outline
+            cards:
+              - type: markdown
+                content: >-
+                  {% set evs = (state_attr('sensor.solar_charger_ultimo_evento', 'eventos') or [])
+                     | rejectattr('level', 'eq', 'debug') | list %}
+                  {% for e in evs[:20] %}
+                  {{ '🔴' if e.level == 'error' else '🟠' if e.level == 'warning' else '•' }}
+                  **{{ e.time }}** · {{ e.text }}
+
+                  {% else %}Sin eventos{% endfor %}
+
+  - title: Estadísticas
+    path: estadisticas
+    icon: mdi:chart-box-outline
+    type: sections
+    max_columns: 3
+    sections:
       # ================================================================== FACTURA
       - type: grid
         cards:
           - type: heading
-            heading: Factura
+            heading: Factura del mes
             icon: mdi:receipt-text
           - type: custom:mushroom-template-card
             entity: sensor.solar_charger_coste_mes
@@ -226,11 +351,11 @@ views:
               {% set dx = 'sensor.solar_charger_descuento_excedentes' %}
               {% macro n(v) %}{{ ('−' ~ e(v)) if (v | float(0)) >= 0.005 else e(0) }}{% endmacro %}
 
-              | | Hoy | Ayer | Mes |
-              |:--|--:|--:|--:|
-              | **Coste** | **{{ e(states('sensor.solar_charger_coste_hoy')) }}** | **{{ e(states('sensor.solar_charger_coste_ayer')) }}** | **{{ e(states('sensor.solar_charger_coste_mes')) }}** |
-              | Solar usada ¹ | {{ e(state_attr(sv, 'hoy')) }} | {{ e(state_attr(sv, 'ayer')) }} | {{ e(state_attr(sv, 'mes')) }} |
-              | Excedentes ² | {{ n(state_attr(dx, 'hoy')) }} | {{ n(state_attr(dx, 'ayer')) }} | {{ n(state_attr(dx, 'mes')) }} |
+              | | Ayer | Mes |
+              |:--|--:|--:|
+              | **Coste** | **{{ e(states('sensor.solar_charger_coste_ayer')) }}** | **{{ e(states('sensor.solar_charger_coste_mes')) }}** |
+              | Solar usada ¹ | {{ e(state_attr(sv, 'ayer')) }} | {{ e(state_attr(sv, 'mes')) }} |
+              | Excedentes ² | {{ n(state_attr(dx, 'ayer')) }} | {{ n(state_attr(dx, 'mes')) }} |
 
               En el año: solar usada {{ e(state_attr(sv, 'ano')) }} · excedentes {{ n(state_attr(dx, 'ano')) }}
 
@@ -360,8 +485,8 @@ views:
                 state_header: 31 dic
                 format: precision0
                 entities:
-                  - entity: sensor.solar_charger_cobertura_solar_hoy
-                    name: Hoy
+                  - entity: sensor.solar_charger_cobertura_solar_ayer
+                    name: Ayer
                     format: precision0
                   - entity: sensor.solar_charger_cobertura_solar_mes
                     name: Mes
@@ -370,44 +495,20 @@ views:
                 name: Faltan para el 60 %
                 icon: mdi:flag-checkered
 
-      # ================================================================== COCHE
+      # ================================================================== COCHE (MES)
       - type: grid
         cards:
           - type: heading
-            heading: Coche
+            heading: Coche este mes
             icon: mdi:car-electric
-          - type: custom:mushroom-template-card
-            entity: sensor.solar_charger_bateria_coche_estimada
-            primary: "Batería ≈ {{ states(entity) | float(0) | round(0) | int }} %"
-            secondary: >-
-              Último dato del coche: {{ state_attr(entity, 'ultimo_dato_real') | int(0) }} %
-            icon: >-
-              {% set n = ((states(entity) | float(0)) / 10) | round(0) | int * 10 %}
-              {{ 'mdi:battery' if n >= 100 else 'mdi:battery-outline' if n <= 0 else 'mdi:battery-' ~ n }}
-            color: teal
-            grid_options: { columns: full }
           - type: entities
             entities:
-              - entity: sensor.solar_charger_coche_cargado_hoy
-                type: custom:multiple-entity-row
+              - entity: sensor.solar_charger_coche_cargado_mes
                 name: Energía cargada
                 icon: mdi:ev-plug-type2
-                state_header: Hoy
-                format: precision1
-                entities:
-                  - entity: sensor.solar_charger_coche_cargado_mes
-                    name: Mes
-                    format: precision1
-              - entity: sensor.solar_charger_coche_solar_hoy
-                type: custom:multiple-entity-row
+              - entity: sensor.solar_charger_coche_solar_mes
                 name: De origen solar
                 icon: mdi:solar-power-variant
-                state_header: Hoy
-                format: precision0
-                entities:
-                  - entity: sensor.solar_charger_coche_solar_mes
-                    name: Mes
-                    format: precision0
 
       # ================================================================== 30 DÍAS
       - type: grid
@@ -525,8 +626,8 @@ views:
                   return (entity.attributes.dias || []).map(d => [new Date(d.d + "T12:00:00").getTime(), d.cob]);
                 show: { legend_value: false }
 
-      # ================================================================== VENTANAS EMERGENTES
-      # Se abren desde los botones de «Ahora»; no ocupan sitio en el panel.
+      # ================================================================== VENTANA EMERGENTE
+      # Desglose de la factura: se abre al tocar la tarjeta «Este mes».
       - type: grid
         cards:
           - type: custom:bubble-card
@@ -565,71 +666,3 @@ views:
                   {%- else -%}
                   La previsión aparecerá cuando haya al menos un día completo registrado.
                   {%- endif %}
-          - type: custom:bubble-card
-            card_type: pop-up
-            hash: "#carga-forzada"
-            name: Carga forzada
-            icon: mdi:calendar-clock
-            cards:
-              - type: custom:auto-entities
-                show_empty: false
-                card:
-                  type: entities
-                  title: Previsión solar (Open-Meteo)
-                filter:
-                  include:
-                    - integration: open_meteo_solar_forecast
-                      entity_id: "*_energy_production_today"
-                      options: { name: Hoy }
-                    - integration: open_meteo_solar_forecast
-                      entity_id: "*_energy_production_today_remaining"
-                      options: { name: Queda hoy }
-                    - integration: open_meteo_solar_forecast
-                      entity_id: "*_energy_production_tomorrow"
-                      options: { name: Mañana }
-              - type: entities
-                title: Programar
-                state_color: true
-                entities:
-                  - entity: sensor.solar_charger_carga_forzada_estado
-                    name: Estado
-                  - entity: text.solar_charger_carga_forzada_inicio
-                    name: Inicio (HH:MM o AAAA-MM-DD HH:MM)
-                  - entity: number.solar_charger_carga_forzada_duracion
-                    name: Duración
-                  - entity: number.solar_charger_carga_forzada_intensidad
-                    name: Intensidad
-                  - type: buttons
-                    entities:
-                      - entity: button.solar_charger_programar_carga_forzada
-                        name: Programar
-                        icon: mdi:calendar-plus
-                        tap_action:
-                          action: perform-action
-                          perform_action: button.press
-                          target: { entity_id: button.solar_charger_programar_carga_forzada }
-                      - entity: button.solar_charger_cancelar_carga_forzada
-                        name: Cancelar
-                        icon: mdi:calendar-remove
-                        tap_action:
-                          action: perform-action
-                          perform_action: button.press
-                          target: { entity_id: button.solar_charger_cancelar_carga_forzada }
-                  - type: divider
-                  - entity: switch.solar_charger_control_automatico
-                    name: Control automático
-          - type: custom:bubble-card
-            card_type: pop-up
-            hash: "#registro"
-            name: Registro
-            icon: mdi:text-box-outline
-            cards:
-              - type: markdown
-                content: >-
-                  {% set evs = (state_attr('sensor.solar_charger_ultimo_evento', 'eventos') or [])
-                     | rejectattr('level', 'eq', 'debug') | list %}
-                  {% for e in evs[:20] %}
-                  {{ '🔴' if e.level == 'error' else '🟠' if e.level == 'warning' else '•' }}
-                  **{{ e.time }}** · {{ e.text }}
-
-                  {% else %}Sin eventos{% endfor %}
