@@ -376,7 +376,6 @@ views:
               tooltip: { shared: true, intersect: false, x: { format: "ddd dd/MM" } }
             yaxis:
               - min: 0
-                max: "|+15%|"
                 decimals: 1
             series:
               # Datos del sensor «Previsión factura mes» (atributo dias: un elemento por día del mes).
@@ -394,6 +393,8 @@ views:
               - entity: sensor.solar_charger_prevision_factura_mes
                 name: Parte fija
                 type: line
+                # Sin punto extra en «ahora»: un punto fuera de las 12:00 estrecha las barras.
+                extend_to: false
                 color: "#8A94A6"
                 stroke_width: 2
                 stroke_dash: 4
@@ -410,6 +411,7 @@ views:
               - entity: sensor.solar_charger_prevision_factura_mes
                 name: Media del mes
                 type: line
+                extend_to: false
                 color: "#E0A030"
                 stroke_width: 2
                 unit: €
