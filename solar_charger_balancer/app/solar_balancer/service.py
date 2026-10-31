@@ -21,12 +21,13 @@ from .storage import save_state
 from .tariff import Tariff
 
 _LOGGER = logging.getLogger(__name__)
-VERSION = "0.9.2"
+VERSION = "0.9.3"
 KEEP_DAYS = 400
 TRACE_LEN = 2500
 # Una potencia doméstica mayor que esto es una lectura errónea del sensor (p. ej. el Beny
 # a veces reporta 409,6 kW durante unos segundos) y se descarta.
 MAX_PLAUSIBLE_KW = 30.0
+EV_SPIKE_HOLD_MINUTES = 3
 NOTIFICATION_ID = "solar_charger_balancer_offline"
 
 
@@ -100,6 +101,9 @@ class Balancer:
         self.offline_logged = False
         self._decided = False
         self._ev_power_prev: tuple[datetime, float] | None = None  # (momento, kW) de la lectura anterior
+        # Tras descartar una potencia imposible del cargador, su contador de energía (que suele
+        # integrar esa potencia) también se ignora un rato para que el pico no entre por ahí.
+        self._ev_spike_until: datetime | None = None
         self.wake = asyncio.Event()
 
     # ------------------------------------------------------------------ estado
@@ -225,31 +229,39 @@ class Balancer:
         self.wake.set()
 
     def _maintenance(self, payload: str) -> None:
-        """Corrección manual: {"accion": "ajustar_coche", "hora": "<ISO>", "kwh": -1.2}.
+        """Corrección manual de una hora ya registrada o en curso, tras una lectura errónea:
 
-        Resta (o suma) energía del coche en una hora ya registrada o en curso, por ejemplo tras
-        una lectura errónea del cargador. También corrige el total usado para estimar la batería.
+        {"accion": "ajustar", "campo": "gen" | "home" | "ev", "hora": "<ISO>", "kwh": -1.2}
+        («ajustar_coche» equivale a campo «ev»). Las correcciones del coche también ajustan el
+        total usado para estimar la batería.
         """
+        names = {"gen": "generación", "home": "hogar", "ev": "coche"}
         try:
             data = json.loads(payload)
-            if data.get("accion") != "ajustar_coche":
-                raise ValueError("acción desconocida")
+            action = data.get("accion")
+            if action == "ajustar_coche":
+                field = "ev"
+            elif action == "ajustar" and data.get("campo") in names:
+                field = data["campo"]
+            else:
+                raise ValueError("acción o campo desconocido")
             hour, kwh = hour_start(datetime.fromisoformat(data["hora"])), float(data["kwh"])
         except (ValueError, KeyError, TypeError) as err:
             self.event(f"Mantenimiento: orden no válida ({err})", "warning")
             return
         targets = [r for r in self.records if r.start == hour]
         if targets:
-            targets[0].ev = max(0.0, targets[0].ev + kwh)
+            setattr(targets[0], field, max(0.0, getattr(targets[0], field) + kwh))
         elif self.hour == hour:
-            self.acc["ev"] = max(0.0, self.acc["ev"] + kwh)
+            self.acc[field] = max(0.0, self.acc[field] + kwh)
         elif self.prev and self.prev["hour"] == hour:
-            self.prev["acc"]["ev"] = max(0.0, self.prev["acc"]["ev"] + kwh)
+            self.prev["acc"][field] = max(0.0, self.prev["acc"][field] + kwh)
         else:
             self.event(f"Mantenimiento: no hay datos de la hora {hour:%d/%m %H:00}", "warning")
             return
-        self.ev_total = max(0.0, self.ev_total + kwh)
-        self.event(f"Corrección manual: coche {kwh:+.3f} kWh en la hora {hour:%d/%m %H:00}", "warning")
+        if field == "ev":
+            self.ev_total = max(0.0, self.ev_total + kwh)
+        self.event(f"Corrección manual: {names[field]} {kwh:+.3f} kWh en la hora {hour:%d/%m %H:00}", "warning")
 
     # ------------------------------------------------------------------ ciclo
     async def _read(self, entity_id: str) -> dict | None:
@@ -286,6 +298,8 @@ class Balancer:
             if kw is not None and abs(kw) > MAX_PLAUSIBLE_KW:
                 self.powers[key] = None
                 self.event(f"Lectura de potencia descartada por imposible ({key}: {kw:g} kW)", "warning")
+                if key == "ev":
+                    self._ev_spike_until = now + timedelta(minutes=EV_SPIKE_HOLD_MINUTES)
         if c.home_includes_charger and self.powers["home"] is not None:
             self.powers["home"] = max(0.0, self.powers["home"] - (self.powers["ev"] or 0.0))
         self.workday_override = (workday["state"] == "on") if is_available(workday) else None
@@ -296,6 +310,9 @@ class Balancer:
             if ev_window is not None:
                 deltas["ev"] = integrated
             # Si falta la potencia (corte o reinicio), ese tramo se cubre con el contador de energía.
+        if ev_window is None and self._ev_spike_until and now <= self._ev_spike_until and deltas["ev"] > 0:
+            self.event(f"Energía del cargador descartada tras un pico de potencia ({deltas['ev']:.3f} kWh)", "warning")
+            deltas["ev"] = 0.0
         if c.home_includes_charger:
             deltas["home"] = max(0.0, deltas["home"] - deltas["ev"])
         for key, state in (("gen", e_gen), ("home", e_home), ("ev", e_ev)):

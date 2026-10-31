@@ -11,11 +11,14 @@ MAX_DELTA_KWH = 10.0
 class CounterTracker:
     """Convierte un sensor de energía acumulada (kWh) en incrementos.
 
-    Tolera reinicios del contador (diarios o por sesión) y lecturas no disponibles.
+    Tolera reinicios del contador (diarios o por sesión) y lecturas no disponibles. Si tras un
+    aparente reinicio el valor vuelve al de antes, la caída fue un fallo de lectura (el sensor
+    marcó 0 un instante) y solo cuenta lo que haya crecido de verdad.
     """
 
     def __init__(self, last: float | None = None):
         self.last = last
+        self._before_reset: float | None = None  # valor anterior a un aparente reinicio
 
     def update(self, value: float | None) -> float:
         if value is None:
@@ -23,12 +26,23 @@ class CounterTracker:
         if self.last is None:
             self.last = value
             return 0.0
+        if self._before_reset is not None:
+            before = self._before_reset
+            if value >= before:
+                # Fallo de lectura: desde el reinicio ya se ha contado `last`.
+                self._before_reset = None
+                delta = value - before - self.last
+                self.last = value
+                return delta if 0 < delta <= MAX_DELTA_KWH else 0.0
+            if value > before * 0.1:
+                self._before_reset = None  # reinicio real: el contador sigue desde cero
         if value >= self.last:
             delta = value - self.last
             self.last = value
             return delta if delta <= MAX_DELTA_KWH else 0.0
         if value <= self.last * 0.1:
             # Reinicio del contador: lo acumulado desde el reinicio es el valor actual.
+            self._before_reset = self.last
             self.last = value
             return value if value <= MAX_DELTA_KWH else 0.0
         # Bajada pequeña: lectura errónea, se ignora sin mover la referencia.

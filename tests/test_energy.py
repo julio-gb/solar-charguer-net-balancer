@@ -13,6 +13,19 @@ def test_counter_increments_and_resets():
     assert round(c.update(0.3), 3) == 0.1
 
 
+def test_counter_glitch_to_zero_is_ignored():
+    c = CounterTracker()
+    c.update(7.0)
+    assert c.update(0.0) == 0.0                         # parece un reinicio…
+    assert round(c.update(7.2), 3) == 0.2               # …pero vuelve: solo cuenta lo que creció
+    # Reinicio real (medianoche): sigue desde cero.
+    c = CounterTracker()
+    c.update(7.0)
+    assert c.update(0.0) == 0.0
+    assert round(c.update(0.4), 3) == 0.4
+    assert round(c.update(0.9), 3) == 0.5
+
+
 def test_hour_record_metrics():
     r = HourRecord("2026-10-10T12:00:00+02:00", gen=1.0, home=0.3, ev=0.7, price=0.087, compensation=0.02)
     assert r.self_consumed == 1.0 and r.grid_import == 0.0

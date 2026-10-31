@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.3
+- Pico de potencia del cargador: además de descartar la lectura, se ignora 3 minutos el contador
+  de energía del cargador, que también lo recogía (el 22/10 entraron 0,72 kWh por esa vía).
+- Contadores de energía: si un contador cae a 0 y vuelve a su valor, se trata como un fallo de
+  lectura y no como un reinicio (el 22/10 se sumaron de golpe 7,17 kWh de generación).
+- Orden de mantenimiento `{"accion": "ajustar", "campo": "gen"|"home"|"ev", ...}` para corregir
+  cualquier energía de una hora.
+
 ## 0.9.2
 - «Factura con Datadis»: el detalle por día pasa al atributo `por_dia` (`dias` es el número de
   días facturados).

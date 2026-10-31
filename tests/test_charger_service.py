@@ -286,6 +286,33 @@ def test_implausible_power_spike_is_discarded():
     assert any("descartada" in e["text"] for e in b.events)
 
 
+def test_power_spike_does_not_leak_through_energy_counter():
+    # El contador de energía del cargador (integral de HA de su potencia) también recoge el pico.
+    b, ha = make_balancer()
+    run(b.poll())
+    ha.set("sensor.ev_power", 258.9, "kW")
+    b.now.t += timedelta(seconds=30)
+    run(b.poll())
+    ha.set("sensor.ev_power", 0, "kW")
+    ha.set("sensor.ev_energy", 200.571, "kWh")
+    for _ in range(3):
+        b.now.t += timedelta(seconds=30)
+        run(b.poll())
+    assert b.acc["ev"] == 0.0 and b.ev_total == 0.0
+
+
+def test_generation_counter_glitch_to_zero_is_not_a_reset():
+    b, ha = make_balancer()
+    ha.set("sensor.pv_energy", 7.17, "kWh")                # contador diario («energía hoy»)
+    run(b.poll())
+    gen0 = b.acc["gen"]
+    for value in (0.0, 7.17, 7.22):                   # el sensor marca 0 un instante y vuelve
+        ha.set("sensor.pv_energy", value, "kWh")
+        b.now.t += timedelta(seconds=30)
+        run(b.poll())
+    assert round(b.acc["gen"] - gen0, 3) == 0.05
+
+
 def test_maintenance_adjusts_car_energy():
     b, ha = make_balancer()
     run(b.poll())
@@ -294,3 +321,6 @@ def test_maintenance_adjusts_car_energy():
     assert round(b.acc["ev"], 3) == 0.355 and round(b.ev_total, 3) == 0.355
     b.handle_command("maintenance", '{"accion": "otra"}')
     assert round(b.acc["ev"], 3) == 0.355
+    b.acc["gen"] = 7.5
+    b.handle_command("maintenance", '{"accion": "ajustar", "campo": "gen", "hora": "2026-10-10T13:00:00+02:00", "kwh": -7.17}')
+    assert round(b.acc["gen"], 3) == 0.33 and round(b.ev_total, 3) == 0.355
