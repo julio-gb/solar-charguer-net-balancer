@@ -270,3 +270,27 @@ def test_power_gap_falls_back_to_energy_counter():
     b.now.t += timedelta(seconds=30)
     run(b.poll())
     assert abs(b.acc["ev"] - (0.1 + 1.38 * 30 / 3600)) < 1e-6
+
+
+def test_implausible_power_spike_is_discarded():
+    b, ha = make_balancer()
+    run(b.poll())
+    ha.set("sensor.ev_power", 409.6, "kW")               # lectura errónea del Beny con el coche parado
+    b.now.t += timedelta(seconds=30)
+    run(b.poll())
+    assert b.powers["ev"] is None
+    ha.set("sensor.ev_power", 0, "kW")
+    b.now.t += timedelta(seconds=30)
+    run(b.poll())
+    assert b.acc["ev"] == 0.0 and b.ev_total == 0.0      # el contador no avanzó: nada cargado
+    assert any("descartada" in e["text"] for e in b.events)
+
+
+def test_maintenance_adjusts_car_energy():
+    b, ha = make_balancer()
+    run(b.poll())
+    b.acc["ev"], b.ev_total = 1.5, 1.5
+    b.handle_command("maintenance", '{"accion": "ajustar_coche", "hora": "2026-10-10T13:20:00+02:00", "kwh": -1.145}')
+    assert round(b.acc["ev"], 3) == 0.355 and round(b.ev_total, 3) == 0.355
+    b.handle_command("maintenance", '{"accion": "otra"}')
+    assert round(b.acc["ev"], 3) == 0.355

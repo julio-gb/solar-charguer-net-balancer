@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from collections import deque
 from datetime import datetime, timedelta
@@ -20,9 +21,12 @@ from .storage import save_state
 from .tariff import Tariff
 
 _LOGGER = logging.getLogger(__name__)
-VERSION = "0.8.1"
+VERSION = "0.8.2"
 KEEP_DAYS = 400
 TRACE_LEN = 2500
+# Una potencia doméstica mayor que esto es una lectura errónea del sensor (p. ej. el Beny
+# a veces reporta 409,6 kW durante unos segundos) y se descarta.
+MAX_PLAUSIBLE_KW = 30.0
 NOTIFICATION_ID = "solar_charger_balancer_offline"
 
 
@@ -185,6 +189,8 @@ class Balancer:
                 self.charger.release()
             self.event("Control automático " + ("activado" if self.enabled else "desactivado"))
             self.last_decision_at = None
+        elif key == "maintenance":
+            self._maintenance(payload)
         elif key == "stats_view":
             if payload in ("General", "Coche", "Hogar"):
                 self.stats_view = payload
@@ -218,6 +224,33 @@ class Balancer:
             self.last_decision_at = None
         self.wake.set()
 
+    def _maintenance(self, payload: str) -> None:
+        """Corrección manual: {"accion": "ajustar_coche", "hora": "<ISO>", "kwh": -1.2}.
+
+        Resta (o suma) energía del coche en una hora ya registrada o en curso, por ejemplo tras
+        una lectura errónea del cargador. También corrige el total usado para estimar la batería.
+        """
+        try:
+            data = json.loads(payload)
+            if data.get("accion") != "ajustar_coche":
+                raise ValueError("acción desconocida")
+            hour, kwh = hour_start(datetime.fromisoformat(data["hora"])), float(data["kwh"])
+        except (ValueError, KeyError, TypeError) as err:
+            self.event(f"Mantenimiento: orden no válida ({err})", "warning")
+            return
+        targets = [r for r in self.records if r.start == hour]
+        if targets:
+            targets[0].ev = max(0.0, targets[0].ev + kwh)
+        elif self.hour == hour:
+            self.acc["ev"] = max(0.0, self.acc["ev"] + kwh)
+        elif self.prev and self.prev["hour"] == hour:
+            self.prev["acc"]["ev"] = max(0.0, self.prev["acc"]["ev"] + kwh)
+        else:
+            self.event(f"Mantenimiento: no hay datos de la hora {hour:%d/%m %H:00}", "warning")
+            return
+        self.ev_total = max(0.0, self.ev_total + kwh)
+        self.event(f"Corrección manual: coche {kwh:+.3f} kWh en la hora {hour:%d/%m %H:00}", "warning")
+
     # ------------------------------------------------------------------ ciclo
     async def _read(self, entity_id: str) -> dict | None:
         if not entity_id:
@@ -249,6 +282,10 @@ class Balancer:
          workday) = await asyncio.gather(*(self._read(i) for i in ids))
 
         self.powers = {"gen": to_float(p_gen), "home": to_float(p_home), "ev": to_float(p_ev)}
+        for key, kw in self.powers.items():
+            if kw is not None and abs(kw) > MAX_PLAUSIBLE_KW:
+                self.powers[key] = None
+                self.event(f"Lectura de potencia descartada por imposible ({key}: {kw:g} kW)", "warning")
         if c.home_includes_charger and self.powers["home"] is not None:
             self.powers["home"] = max(0.0, self.powers["home"] - (self.powers["ev"] or 0.0))
         self.workday_override = (workday["state"] == "on") if is_available(workday) else None

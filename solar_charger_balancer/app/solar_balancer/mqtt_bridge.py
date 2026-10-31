@@ -160,7 +160,7 @@ class MqttBridge:
 
     def _device(self) -> dict:
         return {"identifiers": [PREFIX], "name": DEVICE_NAME, "manufacturer": "Solar Charger Net Balancer",
-                "model": "Addon Home Assistant", "sw_version": "0.8.1"}
+                "model": "Addon Home Assistant", "sw_version": "0.8.2"}
 
     def _discovery(self, entity: Entity) -> dict:
         payload: dict[str, Any] = {
@@ -205,6 +205,8 @@ class MqttBridge:
             client.publish(topic, json.dumps(self._discovery(entity)), retain=True)
             if entity.component in COMMANDABLE:
                 client.subscribe(entity.command_topic)
+        # Órdenes de mantenimiento (sin entidad en HA): solar_charger_balancer/maintenance/set
+        client.subscribe(f"{PREFIX}/maintenance/set")
         client.publish(AVAILABILITY, "online", retain=True)
         for topic, value in self._last.items():
             client.publish(topic, value, retain=True)

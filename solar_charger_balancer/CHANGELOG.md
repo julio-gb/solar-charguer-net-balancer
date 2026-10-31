@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.2
+- Se descartan las lecturas de potencia imposibles (más de 30 kW). El Beny reportó 409,6 kW
+  unos segundos con el coche parado y se contabilizó como 1,1 kWh cargados.
+- Orden de mantenimiento por MQTT (`solar_charger_balancer/maintenance/set`) para corregir
+  la energía del coche de una hora concreta.
+
 ## 0.8.1
 - «Histórico diario» incluye el coste de la energía comprada a la red del coche y del hogar
   (precio de cada hora con impuesto eléctrico e IVA).
