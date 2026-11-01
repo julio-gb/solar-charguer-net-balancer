@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.4
+- MQTT: los valores decimales se redondean a la precisión con la que se muestran en HA antes de
+  publicarse, y solo se publica cuando cambia ese valor redondeado. Las variaciones inapreciables
+  (p. ej. 0,2491 → 0,2493 kW) ya no generan escrituras en el historial de HA.
+- Al arrancar, los sensores sin dato se publican como `None` en lugar de `unknown`, que HA
+  registraba como error en los sensores numéricos.
+
 ## 0.9.3
 - Pico de potencia del cargador: además de descartar la lectura, se ignora 3 minutos el contador
   de energía del cargador, que también lo recogía (el 22/10 entraron 0,72 kWh por esa vía).

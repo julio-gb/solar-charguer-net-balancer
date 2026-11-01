@@ -21,7 +21,7 @@ from .storage import save_state
 from .tariff import Tariff
 
 _LOGGER = logging.getLogger(__name__)
-VERSION = "0.9.3"
+VERSION = "0.9.4"
 KEEP_DAYS = 400
 TRACE_LEN = 2500
 # Una potencia doméstica mayor que esto es una lectura errónea del sensor (p. ej. el Beny

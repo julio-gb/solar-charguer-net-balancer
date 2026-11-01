@@ -162,7 +162,7 @@ class MqttBridge:
 
     def _device(self) -> dict:
         return {"identifiers": [PREFIX], "name": DEVICE_NAME, "manufacturer": "Solar Charger Net Balancer",
-                "model": "Addon Home Assistant", "sw_version": "0.9.3"}
+                "model": "Addon Home Assistant", "sw_version": "0.9.4"}
 
     def _discovery(self, entity: Entity) -> dict:
         payload: dict[str, Any] = {
@@ -221,11 +221,19 @@ class MqttBridge:
     def publish_state(self, key: str, value: Any, attributes: dict | None = None) -> None:
         entity = BY_KEY[key]
         if value is None:
-            text = "unknown" if entity.component == "sensor" else ""
+            # "None" deja el sensor en desconocido sin que HA lo rechace como valor no numérico.
+            text = "None" if entity.component == "sensor" else ""
         elif isinstance(value, bool):
             text = "ON" if value else "OFF"
         elif isinstance(value, float):
-            text = f"{value:.4f}".rstrip("0").rstrip(".")
+            # Se redondea a la precisión que muestra HA: las variaciones por debajo no se publican
+            # (evita escrituras en el historial de HA por cambios inapreciables).
+            decimals = entity.extra.get("suggested_display_precision", 4)
+            text = f"{round(value, decimals):.{decimals}f}"
+            if "." in text:
+                text = text.rstrip("0").rstrip(".")
+            if text == "-0":
+                text = "0"
         else:
             text = str(value)
         self._send(entity.state_topic, text)
